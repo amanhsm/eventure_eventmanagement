@@ -8,7 +8,7 @@ export default function ReportsPage() {
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">System Reports</h1>
-          <p className="text-gray-600 mt-1">Analytics and insights for the EventNest platform</p>
+          <p className="text-gray-600 mt-1">Analytics and insights for the Eventure platform</p>
         </div>
         <SystemReports />
       </main>

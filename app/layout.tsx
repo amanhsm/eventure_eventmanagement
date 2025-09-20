@@ -8,7 +8,7 @@ import { Suspense } from "react"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "EventNest - Christ University",
+  title: "Eventure - Christ University",
   description: "University event management platform",
   generator: "v0.app",
 }

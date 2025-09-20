@@ -1,12 +1,60 @@
+"use client"
+
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Search, Filter, Calendar, MapPin } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
-export function EventFilters() {
+interface Venue {
+  id: number
+  venue_name: string
+  blocks: {
+    block_name: string
+  } | null
+}
+
+export default function EventFilters() {
+  const [venues, setVenues] = useState<Venue[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const supabase = createClient()
+  
   const categories = ["All Events", "Technical", "Cultural", "Sports", "Other"]
   const quickFilters = ["Today", "This Week", "Free Events", "Available Spots"]
-  const venues = ["Main Auditorium", "Central Lawn", "Lab Complex", "Sports Ground"]
+
+  useEffect(() => {
+    fetchVenues()
+  }, [])
+
+  const fetchVenues = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('venues')
+        .select(`
+          id,
+          venue_name,
+          blocks!inner(block_name)
+        `)
+        .eq('availability', true)
+        .order('venue_name')
+
+      if (error) throw error
+      
+      // Transform the data to match our interface
+      const transformedData = (data || []).map(venue => ({
+        id: venue.id,
+        venue_name: venue.venue_name,
+        blocks: Array.isArray(venue.blocks) ? venue.blocks[0] : venue.blocks
+      }))
+      
+      setVenues(transformedData)
+    } catch (error) {
+      console.error('Error fetching venues:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
     // <CHANGE> Added responsive spacing and mobile-first design
@@ -72,16 +120,24 @@ export function EventFilters() {
             </div>
             {/* <CHANGE> Added responsive layout and hover effects */}
             <div className="space-y-2">
-              {venues.map((venue) => (
-                <Button 
-                  key={venue} 
-                  variant="ghost" 
-                  className="justify-start text-xs md:text-sm w-full hover:bg-blue-50 hover:text-blue-700 transition-colors duration-200 cursor-pointer" 
-                  size="sm"
-                >
-                  {venue}
-                </Button>
-              ))}
+              {isLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-8 bg-gray-200 rounded animate-pulse"></div>
+                  ))}
+                </div>
+              ) : (
+                venues.map((venue) => (
+                  <Button 
+                    key={venue.id} 
+                    variant="ghost" 
+                    className="justify-start text-xs md:text-sm w-full hover:bg-blue-50 hover:text-blue-700 transition-colors duration-200 cursor-pointer" 
+                    size="sm"
+                  >
+                    {venue.venue_name} - {venue.blocks?.block_name || 'Unknown Block'}
+                  </Button>
+                ))
+              )}
             </div>
           </div>
         </CardContent>

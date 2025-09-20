@@ -12,7 +12,7 @@ export function Footer() {
                 <Calendar className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="font-bold text-gray-900">EventNest</h3>
+                <h3 className="font-bold text-gray-900">Eventure</h3>
               </div>
             </div>
             <p className="text-gray-600 text-sm">Christ University's premier event management platform</p>

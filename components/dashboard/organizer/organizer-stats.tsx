@@ -11,7 +11,6 @@ export function OrganizerStats() {
   const [stats, setStats] = useState({
     activeEvents: 0,
     totalRegistrations: 0,
-    approvalRate: 0,
     venuesBooked: 0,
   })
   const [isLoading, setIsLoading] = useState(true)
@@ -23,6 +22,7 @@ export function OrganizerStats() {
       try {
         const supabase = createClient()
 
+        // Get organizer profile first
         const { data: organizerProfile, error: organizerError } = await supabase
           .from("organizers")
           .select("id")
@@ -30,26 +30,27 @@ export function OrganizerStats() {
           .single()
 
         if (organizerError) {
-          console.error("[v0] Error fetching organizer profile:", organizerError)
+          console.error("[STATS] Error fetching organizer profile:", organizerError)
           return
         }
 
         const today = new Date().toISOString().split("T")[0]
 
+        // Get active events count (approved events in the future)
         const { count: activeEventsCount } = await supabase
           .from("events")
           .select("id", { count: "exact" })
           .eq("organizer_id", organizerProfile.id)
+          .eq("status", "approved")
           .gte("event_date", today)
 
-        const { data: registrationData } = await supabase
-          .from("events")
-          .select("current_participants")
-          .eq("organizer_id", organizerProfile.id)
+        // Get total registrations across all organizer's events
+        const { count: totalRegistrationsCount } = await supabase
+          .from("event_registrations")
+          .select("id, events!inner(organizer_id)", { count: "exact" })
+          .eq("events.organizer_id", organizerProfile.id)
 
-        const totalRegistrations =
-          registrationData?.reduce((sum, event) => sum + (event.current_participants || 0), 0) || 0
-
+        // Get approval rate (approved events / total submitted events)
         const { count: totalEventsCount } = await supabase
           .from("events")
           .select("id", { count: "exact" })
@@ -61,28 +62,65 @@ export function OrganizerStats() {
           .eq("organizer_id", organizerProfile.id)
           .eq("status", "approved")
 
-        const approvalRate = totalEventsCount ? Math.round((approvedEventsCount / totalEventsCount) * 100) : 0
-
-        const { count: venuesBookedCount } = await supabase
+        // Get venues booked count (distinct venues used by organizer)
+        const { data: venuesData } = await supabase
           .from("events")
-          .select("venue_id", { count: "exact" })
+          .select("venue_id")
           .eq("organizer_id", organizerProfile.id)
           .not("venue_id", "is", null)
 
-        setStats({
+        const uniqueVenues = new Set(venuesData?.map(event => event.venue_id) || [])
+
+        const statsData = {
           activeEvents: activeEventsCount || 0,
-          totalRegistrations,
-          approvalRate,
-          venuesBooked: venuesBookedCount || 0,
-        })
+          totalRegistrations: totalRegistrationsCount || 0,
+          venuesBooked: uniqueVenues.size,
+        }
+
+        console.log("[STATS] Fetched organizer stats:", statsData)
+        setStats(statsData)
       } catch (error) {
-        console.error("[v0] Error fetching organizer stats:", error)
+        console.error("[STATS] Error fetching organizer stats:", error)
       } finally {
         setIsLoading(false)
       }
     }
 
     fetchOrganizerStats()
+
+    // Set up real-time subscription for stats updates
+    const supabase = createClient()
+    const channel = supabase
+      .channel("organizer-stats-updates")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "events",
+        },
+        () => {
+          console.log("[STATS] Real-time update received for events")
+          fetchOrganizerStats()
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "event_registrations",
+        },
+        () => {
+          console.log("[STATS] Real-time update received for registrations")
+          fetchOrganizerStats()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [user?.id])
 
   const statsData = [
@@ -101,14 +139,6 @@ export function OrganizerStats() {
       color: "text-green-600",
       bgColor: "bg-green-100",
       change: "+156 this week",
-    },
-    {
-      icon: TrendingUp,
-      value: isLoading ? "..." : `${stats.approvalRate}%`,
-      label: "Approval Rate",
-      color: "text-yellow-600",
-      bgColor: "bg-yellow-100",
-      change: "+5% from last month",
     },
     {
       icon: MapPin,

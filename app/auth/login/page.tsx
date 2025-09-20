@@ -12,7 +12,7 @@ export default function LoginPage() {
               <Calendar className="w-6 h-6 text-blue-600" />
             </div>
             <div className="text-left">
-              <h1 className="text-2xl font-bold text-white">EventNest</h1>
+              <h1 className="text-2xl font-bold text-white">Eventure</h1>
               <p className="text-sm text-blue-200">Christ University</p>
             </div>
           </Link>

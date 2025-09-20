@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { CalendarIcon, Clock, MapPin, Users, Eye } from "lucide-react"
 import { useState, useEffect } from "react"
-import { createBrowserClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
 
 interface EventCalendarProps {
@@ -21,6 +21,7 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
   const [showEventModal, setShowEventModal] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [eventDates, setEventDates] = useState<Date[]>([])
   const { user } = useAuth()
 
   useEffect(() => {
@@ -29,41 +30,87 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
 
   const fetchEvents = async () => {
     try {
-      const supabase = createBrowserClient()
-      let query = supabase
-        .from("events")
-        .select(`
-          *,
-          organizer:profiles!events_organizer_id_fkey(full_name, email),
-          venue:venues(name),
-          registrations(id, user_id)
-        `)
-        .eq("status", "approved")
-        .order("event_date", { ascending: true })
+      const supabase = createClient()
 
       if (showUserEventsOnly && user) {
         if (userRole === "organizer") {
-          query = query.eq("organizer_id", user.id)
-        } else if (userRole === "student") {
-          // Get events the student is registered for
-          const { data: registrations } = await supabase.from("registrations").select("event_id").eq("user_id", user.id)
+          // Organizer: events they created
+          const { data, error } = await supabase
+            .from("events")
+            .select(`
+              id, title, description, category, event_date, start_time, end_time, 
+              current_participants, max_participants,
+              venues (name),
+              organizers (name)
+            `)
+            .eq("organizer_id", (
+              await supabase.from("organizers").select("id").eq("user_id", user.id).single()
+            ).data?.id || -1)
+            .order("event_date", { ascending: true })
 
-          const eventIds = registrations?.map((r) => r.event_id) || []
-          if (eventIds.length > 0) {
-            query = query.in("id", eventIds)
-          } else {
-            setEvents([])
-            setLoading(false)
-            return
-          }
+          if (error) throw error
+          setEvents(data || [])
+          setLoading(false)
+          return
         }
+
+        // Student: events they are registered for
+        const { data: studentRow } = await supabase
+          .from("students")
+          .select("id")
+          .eq("user_id", user.id)
+          .single()
+
+        if (!studentRow) {
+          setEvents([])
+          setLoading(false)
+          return
+        }
+
+        const { data, error } = await supabase
+          .from("event_registrations")
+          .select(`
+            events (
+              id, title, description, category, event_date, start_time, end_time,
+              current_participants, max_participants,
+              venues (name),
+              organizers (name, department)
+            )
+          `)
+          .eq("student_id", studentRow.id)
+          .order("registration_date", { ascending: false })
+
+        if (error) throw error
+
+        // Flatten to events
+        const mapped = (data || [])
+          .map((r: any) => r.events)
+          .filter(Boolean)
+
+        setEvents(mapped)
+        setLoading(false)
+        return
       }
 
-      const { data: eventsData, error } = await query
+      // Public/All approved upcoming events
+      const { data, error } = await supabase
+        .from("events")
+        .select(`
+          id, title, description, category, event_date, start_time, end_time, 
+          current_participants, max_participants,
+          venues (name),
+          organizers (name)
+        `)
+        .eq("status", "approved")
+        .gte("event_date", new Date().toISOString().split("T")[0])
+        .order("event_date", { ascending: true })
 
       if (error) throw error
-
-      setEvents(eventsData || [])
+      setEvents(data || [])
+      
+      // Set event dates for calendar highlighting
+      const dates = (data || []).map((event: any) => new Date(event.event_date))
+      setEventDates(dates)
     } catch (error) {
       console.error("[v0] Error fetching events:", error)
     } finally {
@@ -84,12 +131,24 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
 
   const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : []
 
+  const handleDateSelect = (date: Date | undefined) => {
+    setSelectedDate(date)
+    if (date) {
+      const eventsOnDate = getEventsForDate(date)
+      if (eventsOnDate.length > 0) {
+        // Show first event details if there are events on this date
+        setSelectedEvent(eventsOnDate[0])
+        setShowEventModal(true)
+      }
+    }
+  }
+
   const getCategoryColor = (category: string) => {
     switch (category) {
       case "technical":
-        return "bg-blue-100 text-blue-800"
+        return "bg-[#799EFF] text-white"
       case "cultural":
-        return "bg-purple-100 text-purple-800"
+        return "bg-[#FFDE63] text-gray-900"
       case "sports":
         return "bg-orange-100 text-orange-800"
       case "academic":
@@ -105,16 +164,16 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
   }
 
   const handleAddToCalendar = (event: any) => {
-    // Create calendar event data
     const eventDate = new Date(event.event_date)
     const title = encodeURIComponent(event.title)
     const details = encodeURIComponent(event.description)
-    const location = encodeURIComponent(event.venue?.name || "")
+    const location = encodeURIComponent(event.venues?.name || event.venue?.name || "")
 
-    // Format date for Google Calendar (YYYYMMDDTHHMMSSZ)
     const startDate = eventDate.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z"
-    const endDate =
-      new Date(eventDate.getTime() + 2 * 60 * 60 * 1000).toISOString().replace(/[-:]/g, "").split(".")[0] + "Z"
+    const endDate = new Date(eventDate.getTime() + 2 * 60 * 60 * 1000)
+      .toISOString()
+      .replace(/[-:]/g, "")
+      .split(".")[0] + "Z"
 
     const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDate}/${endDate}&details=${details}&location=${location}`
 
@@ -158,16 +217,17 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
               <Calendar
                 mode="single"
                 selected={selectedDate}
-                onSelect={setSelectedDate}
-                className="rounded-md border"
+                onSelect={handleDateSelect}
+                className="rounded-md border cursor-pointer"
                 modifiers={{
-                  hasEvent: getEventDates(),
+                  hasEvent: eventDates,
                 }}
                 modifiersStyles={{
                   hasEvent: {
-                    backgroundColor: "#dbeafe",
-                    color: "#1e40af",
+                    backgroundColor: "#799EFF",
+                    color: "white",
                     fontWeight: "bold",
+                    cursor: "pointer",
                   },
                 }}
               />
@@ -189,7 +249,7 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1">
                           <h4 className="font-medium text-gray-900">{event.title}</h4>
-                          <p className="text-sm text-gray-600">by {event.organizer?.full_name}</p>
+                          <p className="text-sm text-gray-600">by {event.organizers?.name || event.organizer?.name}</p>
                         </div>
                         <Badge className={getCategoryColor(event.category)}>{event.category}</Badge>
                       </div>
@@ -201,7 +261,7 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
                         </div>
                         <div className="flex items-center gap-2">
                           <MapPin className="w-3 h-3" />
-                          <span>{event.venue?.name}</span>
+                          <span>{event.venues?.name || event.venue?.name}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Users className="w-3 h-3" />
@@ -249,7 +309,7 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
             <div className="space-y-4">
               <div>
                 <h3 className="font-semibold text-lg">{selectedEvent.title}</h3>
-                <p className="text-sm text-gray-600">by {selectedEvent.organizer?.full_name}</p>
+                <p className="text-sm text-gray-600">by {selectedEvent.organizers?.name || selectedEvent.organizer?.name}</p>
                 <Badge className={getCategoryColor(selectedEvent.category)}>{selectedEvent.category}</Badge>
               </div>
 
@@ -260,7 +320,7 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
                 </div>
                 <div>
                   <p className="font-medium">Venue</p>
-                  <p className="text-sm">{selectedEvent.venue?.name}</p>
+                  <p className="text-sm">{selectedEvent.venues?.name || selectedEvent.venue?.name}</p>
                 </div>
                 <div>
                   <p className="font-medium">Capacity</p>
@@ -268,20 +328,11 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
                     {selectedEvent.current_participants}/{selectedEvent.max_participants}
                   </p>
                 </div>
-                <div>
-                  <p className="font-medium">Registration Fee</p>
-                  <p className="text-sm">₹{selectedEvent.registration_fee || 0}</p>
-                </div>
               </div>
 
               <div>
                 <p className="font-medium">Description</p>
                 <p className="text-sm mt-1">{selectedEvent.description}</p>
-              </div>
-
-              <div>
-                <p className="font-medium">Requirements</p>
-                <p className="text-sm mt-1">{selectedEvent.requirements || "None specified"}</p>
               </div>
 
               <div className="flex gap-2 pt-4">

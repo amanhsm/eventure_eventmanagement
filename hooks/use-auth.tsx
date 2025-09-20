@@ -22,8 +22,8 @@ interface UserProfile {
 interface AuthContextType {
   user: CustomUser | null
   profile: UserProfile | null
-  login: (userData: CustomUser, profileData?: UserProfile) => void
-  logout: () => void
+  login: (userData: CustomUser, profileData?: UserProfile) => Promise<void>
+  logout: () => Promise<void>
   isLoading: boolean
 }
 
@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         await new Promise((resolve) => setTimeout(resolve, 100))
 
-        const storedUser = localStorage.getItem("eventnest_user")
+        const storedUser = localStorage.getItem("eventure_user")
         console.log("[v0] Checking stored user:", storedUser ? "found" : "not found")
 
         if (storedUser) {
@@ -76,8 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkExistingSession()
   }, [])
 
-  const login = (userData: CustomUser, profileData?: UserProfile) => {
-    console.log("[v0] Login called with:", userData)
+  const login = async (userData: CustomUser, profileData?: UserProfile) => {
+    console.log("[AUTH] Login called with:", userData)
     setUser(userData)
     if (profileData) {
       setProfile(profileData)
@@ -87,13 +87,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ...userData,
       profile: profileData,
     }
-    localStorage.setItem("eventnest_user", JSON.stringify(completeUserData))
-    console.log("[v0] User data stored in localStorage")
+    localStorage.setItem("eventure_user", JSON.stringify(completeUserData))
+    console.log("[AUTH] User data stored in localStorage")
   }
 
-  const logout = () => {
-    console.log("[v0] Logout called")
-    localStorage.removeItem("eventnest_user")
+  const logout = async () => {
+    console.log("[AUTH] Logout called")
+    localStorage.removeItem("eventure_user")
     setUser(null)
     setProfile(null)
   }

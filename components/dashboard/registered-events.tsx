@@ -1,12 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Calendar, MapPin, Users, Clock, X, CheckCircle, XCircle, Download, Bell } from "lucide-react"
+import { format } from "date-fns"
 import { useAuth } from "@/hooks/use-auth"
 import { createClient } from "@/lib/supabase/client"
-import { Calendar, Clock, MapPin, Users, CheckCircle, XCircle, Download, X, Bell } from "lucide-react"
 
 interface EventRegistration {
   id: number
@@ -17,9 +18,11 @@ interface EventRegistration {
     title: string
     description: string
     category: string
+    category_id: number
     event_date: string
     start_time: string
     end_time: string
+    registration_fee: number
     venues: {
       name: string
       block: string
@@ -29,6 +32,10 @@ interface EventRegistration {
     organizers: {
       name: string
       department: string
+    } | null
+    event_categories: {
+      name: string
+      color_code: string
     } | null
   }
 }
@@ -48,6 +55,7 @@ export function RegisteredEvents() {
       try {
         const supabase = createClient()
 
+        // Get student profile first
         const { data: studentProfile, error: studentError } = await supabase
           .from("students")
           .select("id")
@@ -55,105 +63,99 @@ export function RegisteredEvents() {
           .single()
 
         if (studentError) {
-          console.error("[v0] Error fetching student profile:", studentError)
+          console.error("[REGISTRATIONS] Error fetching student profile:", studentError)
           return
         }
 
-        const { data, error } = await supabase
+        // Fetch registered events with full details
+        const { data: registrationsData, error: registrationsError } = await supabase
           .from("event_registrations")
           .select(`
             id,
             status,
             registration_date,
-            events (
+            events!inner (
               id,
               title,
               description,
-              category,
+              category_id,
               event_date,
               start_time,
               end_time,
-              venues (name, block, capacity, facilities),
-              organizers (name, department)
+              registration_fee,
+              venues!inner (
+                name,
+                block,
+                capacity,
+                facilities
+              ),
+              organizers!inner (
+                name,
+                department
+              ),
+              event_categories!inner (
+                name,
+                color_code
+              )
             )
           `)
           .eq("student_id", studentProfile.id)
           .order("registration_date", { ascending: false })
 
-        if (error) {
-          console.error("[v0] Error fetching registrations:", error)
-          return
+        if (registrationsError) {
+          console.error("[REGISTRATIONS] Error fetching registrations:", registrationsError)
+          throw new Error(`Failed to fetch registrations: ${registrationsError.message}`)
         }
 
-        setRegistrations(data || [])
-      } catch (error) {
-        console.error("[v0] Error fetching registrations:", error)
+        // Transform data to match interface structure
+        const transformedRegistrations = (registrationsData || []).map((reg: any) => ({
+          ...reg,
+          events: {
+            ...(reg.events as any),
+            category: (reg.events as any).event_categories?.name || "Unknown",
+            venues: Array.isArray((reg.events as any).venues) ? (reg.events as any).venues[0] : (reg.events as any).venues,
+            organizers: Array.isArray((reg.events as any).organizers) ? (reg.events as any).organizers[0] : (reg.events as any).organizers,
+            event_categories: Array.isArray((reg.events as any).event_categories) ? (reg.events as any).event_categories[0] : (reg.events as any).event_categories,
+          }
+        }))
+
+        console.log("[REGISTRATIONS] Fetched registrations:", transformedRegistrations)
+        setRegistrations(transformedRegistrations)
+      } catch (error: any) {
+        console.error("[REGISTRATIONS] Error fetching registrations:", error)
+        setRegistrations([])
       } finally {
         setIsLoading(false)
       }
     }
 
     fetchRegistrations()
-
-    const supabase = createClient()
-    const channel = supabase
-      .channel("registered-events-updates")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "event_registrations",
-        },
-        (payload) => {
-          console.log("[v0] Registration update received:", payload)
-          fetchRegistrations()
-
-          if (payload.eventType === "INSERT") {
-            setNotification("New event registration confirmed!")
-          } else if (payload.eventType === "UPDATE") {
-            setNotification("Event registration updated!")
-          } else if (payload.eventType === "DELETE") {
-            setNotification("Event registration cancelled!")
-          }
-
-          setTimeout(() => setNotification(null), 3000)
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "events",
-        },
-        (payload) => {
-          console.log("[v0] Event details update received:", payload)
-          fetchRegistrations()
-          setNotification("Event details have been updated!")
-          setTimeout(() => setNotification(null), 3000)
-        },
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [user?.id])
 
   const handleCancelRegistration = async (registrationId: number) => {
     setIsCancelling(registrationId)
     try {
       const supabase = createClient()
-      const { error } = await supabase.from("event_registrations").delete().eq("id", registrationId)
 
-      if (error) throw error
+      // Update registration status to cancelled
+      const { error: updateError } = await supabase
+        .from("event_registrations")
+        .update({ status: "cancelled" })
+        .eq("id", registrationId)
 
+      if (updateError) {
+        console.error("[REGISTRATIONS] Error cancelling registration:", updateError)
+        throw new Error(`Failed to cancel registration: ${updateError.message}`)
+      }
+
+      // Remove registration from local state
       setRegistrations((prev) => prev.filter((reg) => reg.id !== registrationId))
       setSelectedEvent(null)
-      console.log("[v0] Registration cancelled successfully")
-    } catch (error) {
-      console.error("[v0] Error cancelling registration:", error)
+      setNotification("Registration cancelled successfully!")
+      setTimeout(() => setNotification(null), 3000)
+      console.log("[REGISTRATIONS] Registration cancelled successfully")
+    } catch (error: any) {
+      console.error("[REGISTRATIONS] Error cancelling registration:", error)
       alert("Failed to cancel registration. Please try again.")
     } finally {
       setIsCancelling(null)

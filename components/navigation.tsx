@@ -42,7 +42,7 @@ export function Navigation() {
             <Calendar className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">EventNest</h1>
+            <h1 className="text-xl font-bold text-gray-900">Eventure</h1>
             <p className="text-sm text-gray-600">Christ University</p>
           </div>
         </Link>
@@ -106,6 +106,12 @@ export function Navigation() {
                     Notifications
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/auth/login" className="cursor-pointer hover:bg-gray-50">
+                      <User className="w-4 h-4 mr-2" />
+                      Sign In
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600 cursor-pointer hover:bg-red-50">
                     <LogOut className="w-4 h-4 mr-2" />
                     Sign Out

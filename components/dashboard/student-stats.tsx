@@ -21,6 +21,7 @@ export function StudentStats() {
       try {
         const supabase = createClient()
 
+        // Get student profile first
         const { data: studentProfile, error: studentError } = await supabase
           .from("students")
           .select("id")
@@ -28,7 +29,7 @@ export function StudentStats() {
           .single()
 
         if (studentError) {
-          console.error("[v0] Error fetching student profile:", studentError)
+          console.error("[STATS] Error fetching student profile:", studentError)
           return
         }
 
@@ -36,31 +37,40 @@ export function StudentStats() {
         const oneWeekFromNow = new Date()
         oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7)
 
+        // Get total registered events count
         const { count: registeredCount } = await supabase
           .from("event_registrations")
           .select("id", { count: "exact" })
           .eq("student_id", studentProfile.id)
+          .eq("status", "registered")
 
+        // Get attended events count (events in the past)
         const { count: attendedCount } = await supabase
           .from("event_registrations")
           .select("id, events!inner(event_date)", { count: "exact" })
           .eq("student_id", studentProfile.id)
+          .eq("status", "attended")
           .lt("events.event_date", today)
 
+        // Get upcoming events count (events in next 7 days)
         const { count: upcomingCount } = await supabase
           .from("event_registrations")
           .select("id, events!inner(event_date)", { count: "exact" })
           .eq("student_id", studentProfile.id)
+          .eq("status", "registered")
           .gte("events.event_date", today)
           .lte("events.event_date", oneWeekFromNow.toISOString().split("T")[0])
 
-        setStats({
+        const statsData = {
           registered: registeredCount || 0,
           attended: attendedCount || 0,
           upcoming: upcomingCount || 0,
-        })
+        }
+
+        console.log("[STATS] Fetched student stats:", statsData)
+        setStats(statsData)
       } catch (error) {
-        console.error("[v0] Error fetching student stats:", error)
+        console.error("[STATS] Error fetching student stats:", error)
       } finally {
         setIsLoading(false)
       }
@@ -68,6 +78,7 @@ export function StudentStats() {
 
     fetchStudentStats()
 
+    // Set up real-time subscription for stats updates
     const supabase = createClient()
     const channel = supabase
       .channel("student-stats-updates")
@@ -79,23 +90,9 @@ export function StudentStats() {
           table: "event_registrations",
         },
         (payload) => {
-          console.log("[v0] Real-time update received:", payload)
-          // Refetch stats when registrations change
+          console.log("[STATS] Real-time update received:", payload)
           fetchStudentStats()
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "events",
-        },
-        (payload) => {
-          console.log("[v0] Event update received:", payload)
-          // Refetch stats when events change
-          fetchStudentStats()
-        },
+        }
       )
       .subscribe()
 

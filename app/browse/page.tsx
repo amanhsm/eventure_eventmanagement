@@ -1,7 +1,7 @@
 import { Navigation } from "@/components/navigation"
-import { BrowseHeader } from "@/components/browse-header"
-import { EventFilters } from "@/components/event-filters"
-import { EventGrid } from "@/components/event-grid"
+import BrowseHeader from "@/components/browse-header"
+import EventFilters from "@/components/event-filters"
+import EventGrid from "@/components/event-grid"
 import { Footer } from "@/components/footer"
 
 export default function BrowsePage() {

@@ -2,8 +2,8 @@ import { Navigation } from "@/components/navigation"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { StudentStats } from "@/components/dashboard/student-stats"
 import { RegisteredEvents } from "@/components/dashboard/registered-events"
-import { UpcomingSchedule } from "@/components/dashboard/upcoming-schedule"
-import { ApplicationStatus } from "@/components/dashboard/application-status"
+import RegistrationReview from "@/components/dashboard/registration-review"
+import StudentProfile from "@/components/dashboard/student-profile"
 import { EventCalendar } from "@/components/dashboard/event-calendar"
 
 export default function StudentDashboard() {
@@ -19,8 +19,8 @@ export default function StudentDashboard() {
             <EventCalendar userRole="student" showUserEventsOnly={true} />
           </div>
           <div className="space-y-8">
-            <UpcomingSchedule />
-            <ApplicationStatus />
+            <RegistrationReview />
+            <StudentProfile />
           </div>
         </div>
       </main>

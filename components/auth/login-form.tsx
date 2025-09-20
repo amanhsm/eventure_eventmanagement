@@ -32,34 +32,89 @@ export function LoginForm() {
 
       const supabase = createClient()
 
+      console.log("[AUTH] Attempting login with:", { 
+        credential, 
+        role, 
+        passwordLength: password.length
+      })
+
+      // Use the verify_user function from our schema
       const { data: userData, error: userError } = await supabase.rpc("verify_user", {
         p_usernumber: credential,
         p_user_type: role,
         p_password: password,
       })
 
-      if (userError || !userData || userData.length === 0) {
-        throw new Error("Invalid credentials")
+      console.log("[AUTH] RPC response:", { userData, userError })
+
+      if (userError) {
+        console.error("[AUTH] RPC error:", userError)
+        throw new Error(`Database error: ${userError.message}`)
+      }
+
+      if (!userData || userData.length === 0) {
+        throw new Error("Invalid credentials - user not found or password incorrect")
       }
 
       const user = userData[0]
+      console.log("[AUTH] User found:", user)
 
       // Get additional user profile data based on role
       let profileData = null
       if (role === "student") {
-        const { data: studentData } = await supabase
+        const { data: studentData, error: studentError } = await supabase
           .from("students")
-          .select("name, department, year, semester, course, events_registered_count")
+          .select("*")
           .eq("user_id", user.id)
           .single()
-        profileData = studentData
+        
+        console.log("[AUTH] Student profile query:", { 
+          user_id: user.id, 
+          studentData, 
+          studentError
+        })
+        
+        if (studentError) {
+          console.warn("[AUTH] Could not fetch student profile:", studentError)
+        } else if (studentData) {
+          profileData = studentData
+        }
       } else if (role === "organizer") {
-        const { data: organizerData } = await supabase
+        const { data: organizerData, error: organizerError } = await supabase
           .from("organizers")
-          .select("name, department, events_created_count")
+          .select("*")
           .eq("user_id", user.id)
           .single()
-        profileData = organizerData
+        
+        console.log("[AUTH] Organizer profile query:", { 
+          user_id: user.id, 
+          organizerData, 
+          organizerError
+        })
+        
+        if (organizerError) {
+          console.warn("[AUTH] Could not fetch organizer profile:", organizerError)
+        } else if (organizerData) {
+          profileData = organizerData
+        }
+      } else if (role === "admin") {
+        const { data: adminData, error: adminError } = await supabase
+          .from("administrators")
+          .select("*")
+          .eq("user_id", user.id)
+          .single()
+        
+        console.log("[AUTH] Admin profile query:", { 
+          user_id: user.id, 
+          adminData, 
+          adminError
+        })
+        
+        if (adminError) {
+          console.warn("[AUTH] Could not fetch admin profile:", adminError)
+        } else if (adminData) {
+          profileData = adminData
+        }
       }
 
       const authenticatedUser = {
@@ -68,27 +123,34 @@ export function LoginForm() {
         role: user.user_type as "student" | "organizer" | "admin",
       }
 
-      console.log("[v0] Login successful for user:", authenticatedUser.usernumber, authenticatedUser.role)
+      console.log("[AUTH] Login successful for user:", authenticatedUser.usernumber, authenticatedUser.role)
 
-      login(authenticatedUser, profileData)
+      // Update last login timestamp
+      await supabase
+        .from("users")
+        .update({ last_login: new Date().toISOString() })
+        .eq("id", user.id)
 
-      setTimeout(() => {
-        switch (role) {
-          case "student":
-            router.push("/dashboard/student")
-            break
-          case "organizer":
-            router.push("/dashboard/organizer")
-            break
-          case "admin":
-            router.push("/dashboard/admin")
-            break
-          default:
-            router.push("/dashboard")
-        }
-      }, 100)
+      await login(authenticatedUser, profileData || undefined)
+
+      // Route to appropriate dashboard
+      console.log("[AUTH] Routing to dashboard for role:", role)
+      
+      switch (role) {
+        case "student":
+          router.push("/dashboard/student")
+          break
+        case "organizer":
+          router.push("/dashboard/organizer")
+          break
+        case "admin":
+          router.push("/dashboard/admin")
+          break
+        default:
+          router.push("/dashboard")
+      }
     } catch (error: any) {
-      console.log("[v0] Login error:", error)
+      console.log("[AUTH] Login error:", error)
       setError(error.message || "Authentication failed")
     } finally {
       setIsLoading(false)
