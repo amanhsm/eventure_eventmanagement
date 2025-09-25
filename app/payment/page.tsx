@@ -16,8 +16,8 @@ interface PaymentEvent {
   registration_fee: number
   event_date: string
   venues: {
-    name: string
-    block: string
+    venue_name: string
+    blocks?: { block_name: string } | null
   } | null
 }
 
@@ -52,9 +52,9 @@ export default function PaymentPage() {
             title,
             registration_fee,
             event_date,
-            venues!inner (
-              name,
-              block
+            venues (
+              venue_name,
+              blocks ( block_name )
             )
           `)
           .eq("id", eventId)
@@ -64,9 +64,14 @@ export default function PaymentPage() {
           throw new Error(`Failed to fetch event: ${eventError.message}`)
         }
 
+        const unifiedVenue = Array.isArray(eventData.venues) ? eventData.venues[0] : eventData.venues
+        const unifiedBlocks = unifiedVenue && Array.isArray((unifiedVenue as any).blocks)
+          ? (unifiedVenue as any).blocks[0]
+          : unifiedVenue?.blocks || null
+
         const transformedEvent = {
           ...eventData,
-          venues: Array.isArray(eventData.venues) ? eventData.venues[0] : eventData.venues,
+          venues: unifiedVenue ? { ...unifiedVenue, blocks: unifiedBlocks } : null,
         }
 
         setEvent(transformedEvent)
@@ -216,7 +221,8 @@ export default function PaymentPage() {
                 <div className="bg-gray-50 p-3 rounded-lg">
                   <p className="font-medium">{event.title}</p>
                   <p className="text-sm text-gray-600">
-                    {event.venues?.name}, {event.venues?.block}
+                    {event.venues?.venue_name}
+                    {event.venues?.blocks?.block_name ? `, ${event.venues.blocks.block_name}` : ""}
                   </p>
                   <p className="text-sm text-gray-600">
                     {new Date(event.event_date).toLocaleDateString()}

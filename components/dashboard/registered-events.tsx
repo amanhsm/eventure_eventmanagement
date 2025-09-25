@@ -24,10 +24,13 @@ interface EventRegistration {
     end_time: string
     registration_fee: number
     venues: {
-      name: string
-      block: string
-      capacity: number
-      facilities: string[] | null
+      id: number
+      venue_name: string
+      block_id: number
+      max_capacity: number
+      blocks: {
+        block_name: string
+      }
     } | null
     organizers: {
       name: string
@@ -74,7 +77,7 @@ export function RegisteredEvents() {
             id,
             status,
             registration_date,
-            events!inner (
+            events (
               id,
               title,
               description,
@@ -83,17 +86,20 @@ export function RegisteredEvents() {
               start_time,
               end_time,
               registration_fee,
-              venues!inner (
-                name,
-                block,
-                capacity,
-                facilities
+              venues (
+                id,
+                venue_name,
+                block_id,
+                max_capacity,
+                blocks (
+                  block_name
+                )
               ),
-              organizers!inner (
+              organizers (
                 name,
                 department
               ),
-              event_categories!inner (
+              event_categories (
                 name,
                 color_code
               )
@@ -169,7 +175,7 @@ EVENT TICKET
 Event: ${event.events.title}
 Date: ${new Date(event.events.event_date).toLocaleDateString()}
 Time: ${event.events.start_time} - ${event.events.end_time}
-Venue: ${event.events.venues?.name || "TBA"}, ${event.events.venues?.block || ""}
+Venue: ${event.events.venues?.venue_name || "TBA"}${event.events.venues?.blocks ? `, ${event.events.venues.blocks.block_name}` : ""}
 Registration ID: ${event.id}
 Status: ${event.status}
     `
@@ -252,7 +258,7 @@ Status: ${event.status}
                   </div>
                   <div className="flex items-center gap-1">
                     <MapPin className="h-4 w-4" />
-                    {reg.events.venues?.name || "TBA"}
+                    {reg.events.venues?.venue_name || "TBA"}
                   </div>
                 </div>
               </div>
@@ -308,7 +314,7 @@ Status: ${event.status}
                   <div className="flex items-center gap-2 text-sm">
                     <MapPin className="h-4 w-4 text-blue-600" />
                     <span>
-                      {selectedEvent.events.venues.name}, {selectedEvent.events.venues.block}
+                      {selectedEvent.events.venues.venue_name}, {selectedEvent.events.venues.blocks.block_name}
                     </span>
                   </div>
                 )}
@@ -322,16 +328,12 @@ Status: ${event.status}
                 )}
               </div>
 
-              {selectedEvent.events.venues?.facilities && (
+              {selectedEvent.events.venues && (
                 <div className="space-y-2">
-                  <h4 className="font-medium">Facilities</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedEvent.events.venues.facilities.map((facility, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {facility}
-                      </Badge>
-                    ))}
-                  </div>
+                  <h4 className="font-medium">Venue Details</h4>
+                  <p className="text-sm">
+                    Capacity: {selectedEvent.events.venues.max_capacity} people
+                  </p>
                 </div>
               )}
 

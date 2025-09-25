@@ -40,7 +40,7 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
             .select(`
               id, title, description, category, event_date, start_time, end_time, 
               current_participants, max_participants,
-              venues (name),
+              venues (venue_name, blocks (block_name)),
               organizers (name)
             `)
             .eq("organizer_id", (
@@ -73,7 +73,7 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
             events (
               id, title, description, category, event_date, start_time, end_time,
               current_participants, max_participants,
-              venues (name),
+              venues (venue_name, blocks (block_name)),
               organizers (name, department)
             )
           `)
@@ -98,7 +98,7 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
         .select(`
           id, title, description, category, event_date, start_time, end_time, 
           current_participants, max_participants,
-          venues (name),
+          venues (venue_name, blocks (block_name)),
           organizers (name)
         `)
         .eq("status", "approved")
@@ -167,7 +167,10 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
     const eventDate = new Date(event.event_date)
     const title = encodeURIComponent(event.title)
     const details = encodeURIComponent(event.description)
-    const location = encodeURIComponent(event.venues?.name || event.venue?.name || "")
+    const location = encodeURIComponent(
+      (event.venues?.venue_name || event.venues?.name || event.venue?.venue_name || event.venue?.name || "") +
+      (event.venues?.blocks?.block_name ? ", " + event.venues.blocks.block_name : "")
+    )
 
     const startDate = eventDate.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z"
     const endDate = new Date(eventDate.getTime() + 2 * 60 * 60 * 1000)
@@ -261,7 +264,10 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
                         </div>
                         <div className="flex items-center gap-2">
                           <MapPin className="w-3 h-3" />
-                          <span>{event.venues?.name || event.venue?.name}</span>
+                          <span>
+                            {event.venues?.venue_name || event.venues?.name || event.venue?.venue_name || event.venue?.name}
+                            {event.venues?.blocks?.block_name ? `, ${event.venues.blocks.block_name}` : ""}
+                          </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Users className="w-3 h-3" />
@@ -320,7 +326,10 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
                 </div>
                 <div>
                   <p className="font-medium">Venue</p>
-                  <p className="text-sm">{selectedEvent.venues?.name || selectedEvent.venue?.name}</p>
+                  <p className="text-sm">
+                    {selectedEvent.venues?.venue_name || selectedEvent.venues?.name || selectedEvent.venue?.venue_name || selectedEvent.venue?.name}
+                    {selectedEvent.venues?.blocks?.block_name ? `, ${selectedEvent.venues.blocks.block_name}` : ""}
+                  </p>
                 </div>
                 <div>
                   <p className="font-medium">Capacity</p>

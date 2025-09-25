@@ -30,7 +30,7 @@ export function UpcomingSchedule() {
             id,
             title,
             event_date,
-            venue:venues(name),
+            venue:venues(venue_name, blocks(block_name)),
             category,
             status
           )
@@ -117,7 +117,7 @@ export function UpcomingSchedule() {
               <div key={event.id} className="border-l-4 border-blue-600 pl-4 py-2">
                 <div className="flex items-start justify-between mb-2">
                   <h4 className="font-medium text-gray-900">{event.title}</h4>
-                  <Badge className={getStatusColor(event.status)} size="sm">
+                  <Badge className={getStatusColor(event.status)}>
                     {event.status === "approved" ? "confirmed" : event.status}
                   </Badge>
                 </div>
@@ -130,7 +130,10 @@ export function UpcomingSchedule() {
                   </div>
                   <div className="flex items-center gap-2">
                     <MapPin className="w-3 h-3" />
-                    <span>{event.venue?.name}</span>
+                    <span>
+                      {event.venue?.venue_name}
+                      {event.venue?.blocks?.block_name ? `, ${event.venue.blocks.block_name}` : ""}
+                    </span>
                   </div>
                 </div>
               </div>

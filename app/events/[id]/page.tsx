@@ -24,10 +24,10 @@ interface EventDetail {
   registration_fee: number
   status: string
   venues: {
-    name: string
-    block: string
-    capacity: number
-    facilities: string[] | null
+    venue_name: string
+    blocks?: { block_name: string } | null
+    max_capacity?: number
+    facilities?: string[] | null
   } | null
   organizers: {
     name: string
@@ -55,7 +55,7 @@ export default function EventDetailPage() {
         const supabase = createClient()
         const eventId = params.id
 
-        // Fetch event details
+        // Fetch event details (normalized schema)
         const { data: eventData, error: eventError } = await supabase
           .from("events")
           .select(`
@@ -71,17 +71,16 @@ export default function EventDetailPage() {
             registration_deadline,
             registration_fee,
             status,
-            venues!inner (
-              name,
-              block,
-              capacity,
-              facilities
+            venues (
+              venue_name,
+              blocks ( block_name ),
+              max_capacity
             ),
-            organizers!inner (
+            organizers (
               name,
               department
             ),
-            event_categories!inner (
+            event_categories (
               name,
               color_code
             )
@@ -93,11 +92,18 @@ export default function EventDetailPage() {
           throw new Error(`Failed to fetch event: ${eventError.message}`)
         }
 
-        // Transform data
+        // Transform data: normalize nested arrays to single objects
+        const unifiedVenue = Array.isArray(eventData.venues) ? eventData.venues[0] : eventData.venues
+        const unifiedBlocks = unifiedVenue && Array.isArray((unifiedVenue as any).blocks)
+          ? (unifiedVenue as any).blocks[0]
+          : unifiedVenue?.blocks || null
+
         const transformedEvent = {
           ...eventData,
-          category: (eventData.event_categories as any)?.name || "Unknown",
-          venues: Array.isArray(eventData.venues) ? eventData.venues[0] : eventData.venues,
+          category: (Array.isArray(eventData.event_categories)
+            ? eventData.event_categories[0]?.name
+            : (eventData.event_categories as any)?.name) || "Unknown",
+          venues: unifiedVenue ? { ...unifiedVenue, blocks: unifiedBlocks } : null,
           organizers: Array.isArray(eventData.organizers) ? eventData.organizers[0] : eventData.organizers,
           event_categories: Array.isArray(eventData.event_categories) ? eventData.event_categories[0] : eventData.event_categories,
         }
@@ -298,7 +304,8 @@ export default function EventDetailPage() {
                   <div>
                     <p className="font-medium">Venue</p>
                     <p className="text-gray-600">
-                      {event.venues?.name}, {event.venues?.block}
+                      {event.venues?.venue_name}
+                      {event.venues?.blocks?.block_name ? `, ${event.venues.blocks.block_name}` : ""}
                     </p>
                   </div>
                 </div>
@@ -334,18 +341,7 @@ export default function EventDetailPage() {
                 </div>
               </div>
 
-              {event.venues?.facilities && event.venues.facilities.length > 0 && (
-                <div>
-                  <h3 className="font-semibold mb-2">Venue Facilities</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {event.venues.facilities.map((facility, index) => (
-                      <Badge key={index} variant="outline">
-                        {facility}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
+              
             </CardContent>
           </Card>
         </div>

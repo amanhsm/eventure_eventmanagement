@@ -31,7 +31,7 @@ export function EventApprovals() {
         .select(`
           *,
           organizer:profiles!events_organizer_id_fkey(full_name, email),
-          venue:venues(name)
+          venue:venues(venue_name, blocks(block_name))
         `)
         .eq("status", "pending")
         .order("created_at", { ascending: false })
@@ -221,7 +221,10 @@ export function EventApprovals() {
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <MapPin className="w-4 h-4 text-blue-600" />
-                      <span>{event.venue?.name || event.venue_id}</span>
+                      <span>
+                        {event.venue?.venue_name || event.venue_id}
+                        {event.venue?.blocks?.block_name ? `, ${event.venue.blocks.block_name}` : ""}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Users className="w-4 h-4 text-blue-600" />
@@ -296,7 +299,10 @@ export function EventApprovals() {
                 </div>
                 <div>
                   <Label className="font-medium">Venue</Label>
-                  <p className="text-sm">{selectedEvent.venue?.name || selectedEvent.venue_id}</p>
+                  <p className="text-sm">
+                    {selectedEvent.venue?.venue_name || selectedEvent.venue_id}
+                    {selectedEvent.venue?.blocks?.block_name ? `, ${selectedEvent.venue.blocks.block_name}` : ""}
+                  </p>
                 </div>
                 <div>
                   <Label className="font-medium">Capacity</Label>

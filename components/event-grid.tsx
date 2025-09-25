@@ -28,8 +28,10 @@ interface Event {
   venue_id: number
   organizer_id: number
   venues: {
-    name: string
-    block: string
+    venue_name: string
+    blocks?: {
+      block_name: string
+    } | null
   } | null
   organizers: {
     name: string
@@ -72,15 +74,17 @@ export default function EventGrid() {
             status,
             venue_id,
             organizer_id,
-            venues!inner (
-              name,
-              block
+            venues (
+              venue_name,
+              blocks (
+                block_name
+              )
             ),
-            organizers!inner (
+            organizers (
               name,
               department
             ),
-            event_categories!inner (
+            event_categories (
               name,
               color_code
             )
@@ -103,11 +107,18 @@ export default function EventGrid() {
               .eq("event_id", event.id)
               .eq("status", "registered")
 
+            const unifiedVenue = Array.isArray(event.venues) ? event.venues[0] : event.venues
+            const unifiedBlocks = unifiedVenue && Array.isArray((unifiedVenue as any).blocks)
+              ? (unifiedVenue as any).blocks[0]
+              : unifiedVenue?.blocks || null
+
             return {
               ...event,
-              category: (event.event_categories as any)?.name || "Unknown",
+              category: (Array.isArray(event.event_categories)
+                ? event.event_categories[0]?.name
+                : (event.event_categories as any)?.name) || "Unknown",
               current_participants: participantCount || 0,
-              venues: Array.isArray(event.venues) ? event.venues[0] : event.venues,
+              venues: unifiedVenue ? { ...unifiedVenue, blocks: unifiedBlocks } : null,
               organizers: Array.isArray(event.organizers) ? event.organizers[0] : event.organizers,
               event_categories: Array.isArray(event.event_categories) ? event.event_categories[0] : event.event_categories,
             }
@@ -165,7 +176,7 @@ export default function EventGrid() {
       day: "numeric",
       year: "numeric",
     }),
-    location: event.venues ? `${event.venues.name}, ${event.venues.block}` : "TBA",
+    location: event.venues ? `${event.venues.venue_name}${event.venues.blocks?.block_name ? ", " + event.venues.blocks.block_name : ""}` : "TBA",
     registered: event.current_participants || 0,
     capacity: event.max_participants || 0,
     deadline: new Date(event.registration_deadline).toLocaleDateString("en-US", {
