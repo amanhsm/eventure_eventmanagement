@@ -25,6 +25,12 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
   const { user } = useAuth()
 
   useEffect(() => {
+    console.log('[CALENDAR] Component mounted/updated:', { 
+      userRole, 
+      showUserEventsOnly, 
+      userId: user?.id,
+      userExists: !!user 
+    })
     fetchEvents()
   }, [user, showUserEventsOnly])
 
@@ -55,13 +61,16 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
         }
 
         // Student: events they are registered for
-        const { data: studentRow } = await supabase
+        const { data: studentRow, error: studentError } = await supabase
           .from("students")
           .select("id")
           .eq("user_id", user.id)
           .single()
 
+        console.log('[CALENDAR] Student lookup:', { studentRow, studentError, userId: user.id })
+
         if (!studentRow) {
+          console.log('[CALENDAR] No student profile found')
           setEvents([])
           setLoading(false)
           return
@@ -71,23 +80,52 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
           .from("event_registrations")
           .select(`
             events (
-              id, title, description, category, event_date, start_time, end_time,
+              id, title, description, category_id, event_date, start_time, end_time,
               current_participants, max_participants,
               venues (venue_name, blocks (block_name)),
-              organizers (name, department)
+              organizers (name, department),
+              event_categories (name, color_code)
             )
           `)
           .eq("student_id", studentRow.id)
+          .eq("status", "registered")
           .order("registration_date", { ascending: false })
 
-        if (error) throw error
+        if (error) {
+          console.log('[CALENDAR] Registration query error:', error)
+          throw error
+        }
 
-        // Flatten to events
+        console.log('[CALENDAR] Raw registration data:', data)
+
+        // Flatten to events and normalize data
         const mapped = (data || [])
           .map((r: any) => r.events)
           .filter(Boolean)
+          .map((event: any) => ({
+            ...event,
+            category: Array.isArray(event.event_categories) 
+              ? event.event_categories[0]?.name 
+              : event.event_categories?.name || "Unknown",
+            venues: Array.isArray(event.venues) ? event.venues[0] : event.venues,
+            organizers: Array.isArray(event.organizers) ? event.organizers[0] : event.organizers
+          }))
 
         setEvents(mapped)
+        
+        // Set event dates for calendar highlighting
+        const dates = mapped.map((event: any) => {
+          const eventDate = new Date(event.event_date)
+          // Normalize to local date to avoid timezone issues
+          return new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate())
+        })
+        setEventDates(dates)
+        
+        // Debug logging
+        console.log('[CALENDAR] Student registered events:', mapped.length)
+        console.log('[CALENDAR] Event dates for highlighting:', dates)
+        console.log('[CALENDAR] Mapped events:', mapped)
+        
         setLoading(false)
         return
       }
@@ -96,23 +134,41 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
       const { data, error } = await supabase
         .from("events")
         .select(`
-          id, title, description, category, event_date, start_time, end_time, 
+          id, title, description, category_id, event_date, start_time, end_time, 
           current_participants, max_participants,
           venues (venue_name, blocks (block_name)),
-          organizers (name)
+          organizers (name),
+          event_categories (name, color_code)
         `)
         .eq("status", "approved")
         .gte("event_date", new Date().toISOString().split("T")[0])
         .order("event_date", { ascending: true })
 
       if (error) throw error
-      setEvents(data || [])
+      
+      // Normalize public events data
+      const normalizedEvents = (data || []).map((event: any) => ({
+        ...event,
+        category: Array.isArray(event.event_categories) 
+          ? event.event_categories[0]?.name 
+          : event.event_categories?.name || "Unknown",
+        venues: Array.isArray(event.venues) ? event.venues[0] : event.venues,
+        organizers: Array.isArray(event.organizers) ? event.organizers[0] : event.organizers
+      }))
+      
+      setEvents(normalizedEvents)
       
       // Set event dates for calendar highlighting
-      const dates = (data || []).map((event: any) => new Date(event.event_date))
+      const dates = normalizedEvents.map((event: any) => {
+        const eventDate = new Date(event.event_date)
+        // Normalize to local date to avoid timezone issues
+        return new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate())
+      })
       setEventDates(dates)
     } catch (error) {
-      console.error("[v0] Error fetching events:", error)
+      // Handle error silently or show user-friendly message
+      setEvents([])
+      setEventDates([])
     } finally {
       setLoading(false)
     }
@@ -121,7 +177,10 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
   const getEventsForDate = (date: Date) => {
     return events.filter((event) => {
       const eventDate = new Date(event.event_date)
-      return eventDate.toDateString() === date.toDateString()
+      // Normalize both dates to avoid timezone issues
+      const normalizedEventDate = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate())
+      const normalizedSelectedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+      return normalizedEventDate.getTime() === normalizedSelectedDate.getTime()
     })
   }
 
@@ -132,9 +191,11 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
   const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : []
 
   const handleDateSelect = (date: Date | undefined) => {
+    console.log('[CALENDAR] Date selected:', date)
     setSelectedDate(date)
     if (date) {
       const eventsOnDate = getEventsForDate(date)
+      console.log('[CALENDAR] Events found for selected date:', eventsOnDate.length, eventsOnDate)
       if (eventsOnDate.length > 0) {
         // Show first event details if there are events on this date
         setSelectedEvent(eventsOnDate[0])
@@ -223,14 +284,21 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
                 onSelect={handleDateSelect}
                 className="rounded-md border cursor-pointer"
                 modifiers={{
-                  hasEvent: eventDates,
+                  hasEvent: (date) => {
+                    return eventDates.some(eventDate => {
+                      const normalizedEventDate = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate())
+                      const normalizedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+                      return normalizedEventDate.getTime() === normalizedDate.getTime()
+                    })
+                  },
                 }}
                 modifiersStyles={{
                   hasEvent: {
-                    backgroundColor: "#799EFF",
+                    backgroundColor: "#3B82F6",
                     color: "white",
                     fontWeight: "bold",
                     cursor: "pointer",
+                    borderRadius: "6px",
                   },
                 }}
               />
@@ -260,7 +328,7 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
                       <div className="space-y-1 text-sm text-gray-600 mb-3">
                         <div className="flex items-center gap-2">
                           <Clock className="w-3 h-3" />
-                          <span>{new Date(event.event_date).toLocaleTimeString()}</span>
+                          <span>{event.start_time} - {event.end_time}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <MapPin className="w-3 h-3" />
@@ -281,7 +349,7 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
                         <Button
                           size="sm"
                           variant="outline"
-                          className="flex items-center gap-1 bg-transparent"
+                          className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 border-blue-600 text-white hover:text-white"
                           onClick={() => handleViewEvent(event)}
                         >
                           <Eye className="w-3 h-3" />
@@ -289,8 +357,7 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
                         </Button>
                         <Button
                           size="sm"
-                          variant="outline"
-                          className="flex items-center gap-1 bg-transparent"
+                          className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white"
                           onClick={() => handleAddToCalendar(event)}
                         >
                           <CalendarIcon className="w-3 h-3" />
@@ -345,7 +412,10 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
               </div>
 
               <div className="flex gap-2 pt-4">
-                <Button className="flex items-center gap-2" onClick={() => handleAddToCalendar(selectedEvent)}>
+                <Button 
+                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white" 
+                  onClick={() => handleAddToCalendar(selectedEvent)}
+                >
                   <CalendarIcon className="w-4 h-4" />
                   Add to Calendar
                 </Button>

@@ -52,6 +52,18 @@ export default function RegistrationReview() {
 
     try {
       setIsLoading(true)
+      
+      // First get the student profile ID
+      const { data: studentProfile, error: studentError } = await supabase
+        .from('students')
+        .select('id')
+        .eq('user_id', user.id)
+        .single()
+
+      if (studentError) {
+        return
+      }
+
       const { data, error } = await supabase
         .from('event_registrations')
         .select(`
@@ -72,7 +84,7 @@ export default function RegistrationReview() {
             organizers(name)
           )
         `)
-        .eq('student_id', user.id)
+        .eq('student_id', studentProfile.id)
         .eq('status', 'registered')
         .order('registration_date', { ascending: false })
 
@@ -97,7 +109,8 @@ export default function RegistrationReview() {
 
       setRegistrations(transformedData as EventRegistration[])
     } catch (error) {
-      console.error('Error fetching registrations:', error)
+      // Handle error gracefully
+      setRegistrations([])
     } finally {
       setIsLoading(false)
     }
@@ -108,17 +121,71 @@ export default function RegistrationReview() {
 
     try {
       setCancellingId(registrationId)
-      const { error } = await supabase
-        .from('event_registrations')
-        .update({ status: 'cancelled' })
-        .eq('id', registrationId)
+      
+      // Find the registration to get event details
+      const registration = registrations.find(reg => reg.id === registrationId)
+      if (!registration) {
+        throw new Error('Registration not found')
+      }
 
-      if (error) throw error
+      // Update registration status to cancelled
+      const { data: updateData, error: updateError } = await supabase
+        .from('event_registrations')
+        .update({ 
+          status: 'cancelled',
+          cancelled_at: new Date().toISOString(),
+          cancellation_reason: 'Cancelled by student'
+        })
+        .eq('id', registrationId)
+        .select()
+
+      if (updateError) {
+        alert(`Failed to cancel registration: ${updateError.message}`)
+        return
+      }
+      
+      if (!updateData || updateData.length === 0) {
+        // Try using RPC function as fallback
+        const { data: rpcResult, error: rpcError } = await supabase
+          .rpc('cancel_registration_simple', {
+            p_registration_id: registrationId
+          })
+        
+        if (rpcError || !rpcResult?.success) {
+          alert(`Cancellation failed: ${rpcError?.message || rpcResult?.error || 'Unknown error'}`)
+          return
+        }
+        
+        // Skip participant count update since RPC handles it
+      } else {
+
+      // Decrement current_participants count for the event
+      const { data: eventData, error: eventFetchError } = await supabase
+        .from('events')
+        .select('current_participants')
+        .eq('id', registration.events.id)
+        .single()
+
+      if (!eventFetchError && eventData) {
+        const newCount = Math.max(eventData.current_participants - 1, 0)
+        const { error: eventUpdateError } = await supabase
+          .from('events')
+          .update({ current_participants: newCount })
+          .eq('id', registration.events.id)
+
+        if (eventUpdateError) {
+          // Handle error but don't fail the cancellation
+        }
+      }
+      }
 
       // Remove from local state
       setRegistrations(prev => prev.filter(reg => reg.id !== registrationId))
+      
+      // Show success message
+      alert('Registration cancelled successfully!')
+      
     } catch (error) {
-      console.error('Error cancelling registration:', error)
       alert('Failed to cancel registration. Please try again.')
     } finally {
       setCancellingId(null)
@@ -163,7 +230,7 @@ export default function RegistrationReview() {
             <p className="text-gray-600 mb-4">No active registrations</p>
             <Button 
               onClick={() => router.push('/browse')}
-              className="bg-[#799EFF] hover:bg-[#6B8EFF] text-white cursor-pointer"
+              className="bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
             >
               Browse Events
             </Button>
@@ -216,21 +283,20 @@ export default function RegistrationReview() {
 
                   <div className="flex gap-2">
                     <Button
-                      variant="outline"
                       size="sm"
                       onClick={() => handleViewEvent(event.id)}
-                      className="cursor-pointer"
+                      className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white"
                     >
                       <Eye className="w-4 h-4 mr-1" />
                       View Event
                     </Button>
                     {event.cancellation_allowed && (
                       <Button
-                        variant="outline"
+                        variant="destructive"
                         size="sm"
                         onClick={() => handleCancelRegistration(registration.id)}
                         disabled={cancellingId === registration.id}
-                        className="text-red-600 hover:text-red-700 cursor-pointer"
+                        className="cursor-pointer"
                       >
                         <X className="w-4 h-4 mr-1" />
                         {cancellingId === registration.id ? 'Cancelling...' : 'Cancel'}

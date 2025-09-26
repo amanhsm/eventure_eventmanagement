@@ -1,10 +1,26 @@
+"use client"
 import { Navigation } from "@/components/navigation"
 import BrowseHeader from "@/components/browse-header"
 import EventFilters from "@/components/event-filters"
 import EventGrid from "@/components/event-grid"
 import { Footer } from "@/components/footer"
+import { useState } from "react"
 
 export default function BrowsePage() {
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState<string>("all")
+  const [selectedQuickFilter, setSelectedQuickFilter] = useState<string>("")
+  const [selectedVenueId, setSelectedVenueId] = useState<number | null>(null)
+  const [sortBy, setSortBy] = useState<string>("upcoming")
+
+  const clearAllFilters = () => {
+    setSearchQuery("")
+    setSelectedCategory("all")
+    setSelectedQuickFilter("")
+    setSelectedVenueId(null)
+    setSortBy("upcoming")
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
@@ -12,10 +28,27 @@ export default function BrowsePage() {
         <BrowseHeader />
         <div className="flex gap-8 mt-8">
           <aside className="w-80 flex-shrink-0">
-            <EventFilters />
+            <EventFilters
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              selectedCategory={selectedCategory}
+              onCategoryChange={setSelectedCategory}
+              selectedQuickFilter={selectedQuickFilter}
+              onQuickFilterChange={setSelectedQuickFilter}
+              selectedVenueId={selectedVenueId}
+              onVenueSelect={setSelectedVenueId}
+              onClearFilters={clearAllFilters}
+            />
           </aside>
           <div className="flex-1">
-            <EventGrid />
+            <EventGrid
+              searchQuery={searchQuery}
+              categoryFilter={selectedCategory}
+              quickFilter={selectedQuickFilter}
+              venueId={selectedVenueId}
+              sortBy={sortBy}
+              onSortByChange={setSortBy}
+            />
           </div>
         </div>
       </main>

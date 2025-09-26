@@ -1,14 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
+import { useEffect, useMemo, useState } from "react"
 import { EventCard } from "@/components/event-card"
-import { Button } from "@/components/ui/button"
-import { Calendar, MapPin, Users, Clock } from "lucide-react"
-import { format } from "date-fns"
-import { useAuth } from "@/hooks/use-auth"
 import { createClient } from "@/lib/supabase/client"
-import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface Event {
@@ -43,12 +37,26 @@ interface Event {
   } | null
 }
 
-export default function EventGrid() {
+interface EventGridProps {
+  searchQuery: string
+  categoryFilter: string
+  quickFilter: string
+  venueId: number | null
+  sortBy: string
+  onSortByChange: (value: string) => void
+}
+
+export default function EventGrid({
+  searchQuery,
+  categoryFilter,
+  quickFilter,
+  venueId,
+  sortBy,
+  onSortByChange,
+}: EventGridProps) {
   const [events, setEvents] = useState<Event[]>([])
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [sortBy, setSortBy] = useState("upcoming")
-  const [categoryFilter, setCategoryFilter] = useState("all")
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -56,8 +64,15 @@ export default function EventGrid() {
       try {
         const supabase = createClient()
 
-        // Fetch events with venue, organizer, and category details
-        const { data: eventsData, error: eventsError } = await supabase
+        // Helper to get local YYYY-MM-DD (not UTC)
+        const today = new Date()
+        const yyyy = today.getFullYear()
+        const mm = String(today.getMonth() + 1).padStart(2, '0')
+        const dd = String(today.getDate()).padStart(2, '0')
+        const localISO = `${yyyy}-${mm}-${dd}`
+
+        // Build base query
+        let query = supabase
           .from("events")
           .select(`
             id,
@@ -90,8 +105,16 @@ export default function EventGrid() {
             )
           `)
           .eq("status", "approved")
-          .gte("event_date", new Date().toISOString().split("T")[0])
-          .order("event_date", { ascending: true })
+
+        if (quickFilter === "Today") {
+          // Only events happening today; order by start_time so it's not random
+          query = query.eq("event_date", localISO).order("start_time", { ascending: true })
+        } else {
+          // Upcoming and later
+          query = query.gte("event_date", localISO).order("event_date", { ascending: true })
+        }
+
+        const { data: eventsData, error: eventsError } = await query
 
         if (eventsError) {
           console.error("[EVENTS] Error fetching events:", eventsError)
@@ -137,32 +160,70 @@ export default function EventGrid() {
     }
 
     fetchEvents()
-  }, [])
+  }, [quickFilter])
 
+  // Apply filters whenever dependencies change
   useEffect(() => {
     let filtered = [...events]
 
-    if (categoryFilter !== "all") {
-      filtered = filtered.filter((event) => event.category === categoryFilter)
+    // Category filter
+    if (categoryFilter && categoryFilter !== "all") {
+      filtered = filtered.filter((event) => event.category?.toLowerCase() === categoryFilter.toLowerCase())
     }
 
+    // Search filter (title, description, organizer, venue)
+    if (searchQuery?.trim()) {
+      const q = searchQuery.trim().toLowerCase()
+      filtered = filtered.filter((e) => {
+        const inTitle = e.title?.toLowerCase().includes(q)
+        const inDesc = e.description?.toLowerCase().includes(q)
+        const inOrg = e.organizers?.name?.toLowerCase().includes(q)
+        const inVenue = e.venues?.venue_name?.toLowerCase().includes(q) || e.venues?.blocks?.block_name?.toLowerCase().includes(q)
+        return inTitle || inDesc || inOrg || inVenue
+      })
+    }
+
+    // Venue filter
+    if (venueId) {
+      filtered = filtered.filter((e) => e.venue_id === venueId)
+    }
+
+    // Quick filters
+    const today = new Date()
+    if (quickFilter === "Today") {
+      const isoToday = today.toISOString().split("T")[0]
+      filtered = filtered.filter((e) => e.event_date === isoToday)
+    } else if (quickFilter === "This Week") {
+      const start = new Date(today)
+      const end = new Date(today)
+      end.setDate(end.getDate() + 7)
+      filtered = filtered.filter((e) => {
+        const d = new Date(e.event_date)
+        return d >= start && d <= end
+      })
+    } else if (quickFilter === "Free Events") {
+      filtered = filtered.filter((e) => (e.registration_fee || 0) === 0)
+    } else if (quickFilter === "Available Spots") {
+      filtered = filtered.filter((e) => (e.current_participants || 0) < (e.max_participants || 0))
+    }
+
+    // Sorting
+    const sorted = [...filtered]
     switch (sortBy) {
       case "popular":
-        filtered.sort((a, b) => b.current_participants - a.current_participants)
+        sorted.sort((a, b) => b.current_participants - a.current_participants)
         break
       case "deadline":
-        filtered.sort(
-          (a, b) => new Date(a.registration_deadline).getTime() - new Date(b.registration_deadline).getTime(),
-        )
+        sorted.sort((a, b) => new Date(a.registration_deadline).getTime() - new Date(b.registration_deadline).getTime())
         break
       case "upcoming":
       default:
-        filtered.sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())
+        sorted.sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())
         break
     }
 
-    setFilteredEvents(filtered)
-  }, [events, sortBy, categoryFilter])
+    setFilteredEvents(sorted)
+  }, [events, categoryFilter, searchQuery, venueId, quickFilter, sortBy])
 
   const transformEventForCard = (event: Event) => ({
     id: event.id,
@@ -226,18 +287,7 @@ export default function EventGrid() {
       <div className="flex items-center justify-between mb-6">
         <p className="text-gray-600">{filteredEvents.length} events found</p>
         <div className="flex gap-4">
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              <SelectItem value="technical">Technical</SelectItem>
-              <SelectItem value="cultural">Cultural</SelectItem>
-              <SelectItem value="sports">Sports</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={sortBy} onValueChange={setSortBy}>
+          <Select value={sortBy} onValueChange={onSortByChange}>
             <SelectTrigger className="w-40">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>

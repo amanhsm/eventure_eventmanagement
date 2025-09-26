@@ -47,6 +47,7 @@ export default function EventDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isRegistering, setIsRegistering] = useState(false)
   const [isRegistered, setIsRegistered] = useState(false)
+  const [isCancelled, setIsCancelled] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -121,13 +122,15 @@ export default function EventDetailPage() {
           if (studentProfile) {
             const { data: registration } = await supabase
               .from("event_registrations")
-              .select("id")
+              .select("id, status")
               .eq("student_id", studentProfile.id)
               .eq("event_id", eventId)
-              .eq("status", "registered")
               .single()
 
-            setIsRegistered(!!registration)
+            if (registration) {
+              setIsRegistered(registration.status === "registered")
+              setIsCancelled(registration.status === "cancelled")
+            }
           }
         }
       } catch (error: any) {
@@ -162,17 +165,22 @@ export default function EventDetailPage() {
         throw new Error("Student profile not found")
       }
 
-      // Check if already registered
+      // Check if already registered or previously cancelled
       const { data: existingRegistration } = await supabase
         .from("event_registrations")
-        .select("id")
+        .select("id, status")
         .eq("student_id", studentProfile.id)
         .eq("event_id", event?.id)
         .single()
 
       if (existingRegistration) {
-        setError("You are already registered for this event")
-        return
+        if (existingRegistration.status === "registered") {
+          setError("You are already registered for this event")
+          return
+        } else if (existingRegistration.status === "cancelled") {
+          setError("You have previously cancelled your registration for this event. Once cancelled, re-registration is not allowed. For more information, please contact the event coordinator or your respective teacher.")
+          return
+        }
       }
 
       // If event has a fee, redirect to payment portal
@@ -182,7 +190,7 @@ export default function EventDetailPage() {
       }
 
       // For free events, register directly
-      const { error: registrationError } = await supabase
+      const { data: insertData, error: registrationError } = await supabase
         .from("event_registrations")
         .insert({
           student_id: studentProfile.id,
@@ -190,9 +198,19 @@ export default function EventDetailPage() {
           status: "registered",
           registration_date: new Date().toISOString(),
         })
+        .select()
 
-      if (registrationError) {
-        throw new Error(`Registration failed: ${registrationError.message}`)
+      // If direct insert fails due to RLS, try RPC function
+      if (registrationError || !insertData || insertData.length === 0) {
+        const { data: rpcResult, error: rpcError } = await supabase
+          .rpc('register_for_event', {
+            p_event_id: event?.id,
+            p_student_user_id: user.id
+          })
+
+        if (rpcError || !rpcResult?.success) {
+          throw new Error(rpcError?.message || rpcResult?.error || 'Registration failed')
+        }
       }
 
       setIsRegistered(true)
@@ -379,13 +397,25 @@ export default function EventDetailPage() {
                           You are registered for this event
                         </p>
                       </div>
+                    ) : isCancelled ? (
+                      <div className="text-center">
+                        <Badge variant="destructive" className="mb-2">
+                          ✗ Registration Cancelled
+                        </Badge>
+                        <p className="text-sm text-gray-600 mb-2">
+                          You previously cancelled your registration for this event.
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Re-registration is not allowed. For more information, contact the event coordinator or your respective teacher.
+                        </p>
+                      </div>
                     ) : (
                       <Button 
                         onClick={handleRegister}
-                        disabled={isRegistering || isRegistered || isEventFull}
+                        disabled={isRegistering || isRegistered || isCancelled || isEventFull}
                         className="w-full bg-[#799EFF] hover:bg-[#6B8EFF] text-white cursor-pointer"
                       >
-                        {isRegistering ? "Registering..." : isRegistered ? "Already Registered" : isEventFull ? "Event Full" : `Register ${event.registration_fee > 0 ? `(₹${event.registration_fee})` : "(Free)"}`}
+                        {isRegistering ? "Registering..." : isRegistered ? "Already Registered" : isCancelled ? "Registration Cancelled" : isEventFull ? "Event Full" : `Register ${event.registration_fee > 0 ? `(₹${event.registration_fee})` : "(Free)"}`}
                       </Button>
                     )}
                   </div>

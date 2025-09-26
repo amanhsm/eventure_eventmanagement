@@ -1,35 +1,103 @@
+"use client"
+
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Calendar, Users, ArrowRight } from "lucide-react"
+import { Calendar, ArrowRight } from "lucide-react"
 import Link from "next/link"
+import { useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
+
+interface UpcomingEvent {
+  id: number
+  title: string
+  start_time: string
+  venue_name: string
+  block_name?: string
+  category_color: string
+  initials: string
+}
 
 export function HeroSection() {
-  const upcomingEvents = [
-    {
-      id: 1,
-      title: "Tech Talk: AI in Education",
-      time: "2:00 PM",
-      location: "Auditorium A",
-      initials: "TK",
-      bgColor: "bg-blue-600",
-    },
-    {
-      id: 2,
-      title: "Cultural Club Meet",
-      time: "4:00 PM",
-      location: "Main Lawn",
-      initials: "CC",
-      bgColor: "bg-yellow-500",
-    },
-    {
-      id: 3,
-      title: "Web Dev Workshop",
-      time: "6:00 PM",
-      location: "Lab 203",
-      initials: "WS",
-      bgColor: "bg-green-600",
-    },
-  ]
+  const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchUpcomingEvents = async () => {
+      try {
+        const supabase = createClient()
+        
+        // Get today's date in local timezone
+        const today = new Date()
+        const yyyy = today.getFullYear()
+        const mm = String(today.getMonth() + 1).padStart(2, '0')
+        const dd = String(today.getDate()).padStart(2, '0')
+        const localISO = `${yyyy}-${mm}-${dd}`
+
+        const { data, error } = await supabase
+          .from('events')
+          .select(`
+            id,
+            title,
+            start_time,
+            venues (
+              venue_name,
+              blocks (
+                block_name
+              )
+            ),
+            event_categories (
+              name,
+              color_code
+            )
+          `)
+          .eq('status', 'approved')
+          .gte('event_date', localISO)
+          .order('event_date', { ascending: true })
+          .order('start_time', { ascending: true })
+          .limit(3)
+
+        if (error) {
+          console.error('Error fetching upcoming events:', error)
+          return
+        }
+
+        // Transform the data
+        const transformedEvents: UpcomingEvent[] = (data || []).map((event) => {
+          const venue = Array.isArray(event.venues) ? event.venues[0] : event.venues
+          const block = venue && Array.isArray((venue as any).blocks) 
+            ? (venue as any).blocks[0] 
+            : venue?.blocks
+          const category = Array.isArray(event.event_categories) 
+            ? event.event_categories[0] 
+            : event.event_categories
+          
+          // Generate initials from title
+          const words = event.title.split(' ')
+          const initials = words.length >= 2 
+            ? words[0][0] + words[1][0] 
+            : words[0].substring(0, 2)
+
+          return {
+            id: event.id,
+            title: event.title,
+            start_time: event.start_time,
+            venue_name: venue?.venue_name || 'TBA',
+            block_name: block?.block_name,
+            category_color: category?.color_code || '#3B82F6',
+            initials: initials.toUpperCase()
+          }
+        })
+
+        setUpcomingEvents(transformedEvents)
+      } catch (error) {
+        console.error('Error fetching upcoming events:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchUpcomingEvents()
+  }, [])
 
   return (
     <section className="bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white py-16">
@@ -54,55 +122,52 @@ export function HeroSection() {
                   <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
-              <Button
-                size="lg"
-                variant="outline"
-                className="border-white text-white hover:bg-white hover:text-blue-600 bg-transparent transition-all duration-300 hover:scale-105 cursor-pointer"
-              >
-                Learn More
-              </Button>
-            </div>
-
-            <div className="flex items-center gap-8 text-blue-100">
-              <div className="flex items-center gap-2 hover:text-white transition-colors cursor-pointer">
-                <Users className="w-5 h-5" />
-                <span>2000+ Students</span>
-              </div>
-              <div className="flex items-center gap-2 hover:text-white transition-colors cursor-pointer">
-                <Calendar className="w-5 h-5" />
-                <span>50+ Events Monthly</span>
-              </div>
-              <div className="flex items-center gap-2 hover:text-white transition-colors cursor-pointer">
-                <span>⭐</span>
-                <span>4.9/5 Rating</span>
-              </div>
             </div>
           </div>
 
           <div className="w-96 ml-8">
             <Card className="bg-white/10 backdrop-blur-sm border-white/20 p-6 hover:bg-white/15 transition-all duration-300">
-              <h3 className="text-xl font-semibold mb-4 text-blue-200">Upcoming Today</h3>
+              <h3 className="text-xl font-semibold mb-4 text-blue-200">Upcoming Events</h3>
               <div className="space-y-4">
-                {upcomingEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className="flex items-center gap-3 hover:bg-white/10 p-2 rounded-lg transition-all duration-200 cursor-pointer group"
-                  >
-                    <div
-                      className={`w-10 h-10 ${event.bgColor} rounded-lg flex items-center justify-center text-white font-semibold text-sm group-hover:scale-110 transition-transform`}
-                    >
-                      {event.initials}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-white group-hover:text-yellow-300 transition-colors">
-                        {event.title}
-                      </h4>
-                      <p className="text-sm text-blue-200">
-                        {event.time} • {event.location}
-                      </p>
-                    </div>
+                {isLoading ? (
+                  // Loading skeleton
+                  <div className="space-y-4">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="flex items-center gap-3 p-2">
+                        <div className="w-10 h-10 bg-white/20 rounded-lg animate-pulse"></div>
+                        <div className="flex-1">
+                          <div className="h-4 bg-white/20 rounded mb-2 animate-pulse"></div>
+                          <div className="h-3 bg-white/20 rounded w-2/3 animate-pulse"></div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                ) : upcomingEvents.length > 0 ? (
+                  upcomingEvents.map((event) => (
+                    <Link key={event.id} href={`/events/${event.id}`}>
+                      <div className="flex items-center gap-3 hover:bg-white/10 p-2 rounded-lg transition-all duration-200 cursor-pointer group">
+                        <div
+                          className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold text-sm group-hover:scale-110 transition-transform"
+                          style={{ backgroundColor: event.category_color }}
+                        >
+                          {event.initials}
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-medium text-white group-hover:text-yellow-300 transition-colors">
+                            {event.title}
+                          </h4>
+                          <p className="text-sm text-blue-200">
+                            {event.start_time} • {event.venue_name}{event.block_name ? `, ${event.block_name}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-blue-200 text-sm">No upcoming events found</p>
+                  </div>
+                )}
               </div>
               <Link href="/browse">
                 <Button

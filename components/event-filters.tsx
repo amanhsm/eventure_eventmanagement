@@ -3,7 +3,7 @@
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Search, Filter, Calendar, MapPin } from 'lucide-react'
+import { Search, Filter, Calendar, MapPin, X } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -15,12 +15,40 @@ interface Venue {
   } | null
 }
 
-export default function EventFilters() {
+interface EventFiltersProps {
+  searchQuery: string
+  onSearchChange: (value: string) => void
+  selectedCategory: string
+  onCategoryChange: (value: string) => void
+  selectedQuickFilter: string
+  onQuickFilterChange: (value: string) => void
+  selectedVenueId: number | null
+  onVenueSelect: (venueId: number | null) => void
+  onClearFilters: () => void
+}
+
+export default function EventFilters({
+  searchQuery,
+  onSearchChange,
+  selectedCategory,
+  onCategoryChange,
+  selectedQuickFilter,
+  onQuickFilterChange,
+  selectedVenueId,
+  onVenueSelect,
+  onClearFilters,
+}: EventFiltersProps) {
   const [venues, setVenues] = useState<Venue[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const supabase = createClient()
   
-  const categories = ["All Events", "Technical", "Cultural", "Sports", "Other"]
+  const categories = [
+    { label: "All Events", value: "all" },
+    { label: "Technical", value: "technical" },
+    { label: "Cultural", value: "cultural" },
+    { label: "Sports", value: "sports" },
+    { label: "Other", value: "other" },
+  ]
   const quickFilters = ["Today", "This Week", "Free Events", "Available Spots"]
 
   useEffect(() => {
@@ -61,14 +89,27 @@ export default function EventFilters() {
     <div className="space-y-4 md:space-y-6">
       <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
         <CardHeader className="pb-3 md:pb-4">
-          <CardTitle className="text-base md:text-lg">Filters</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base md:text-lg">Filters</CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClearFilters}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Clear All
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4 md:space-y-6">
           <div className="relative">
             <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
             {/* <CHANGE> Added responsive padding and focus states */}
             <Input 
-              placeholder="Search events..." 
+              placeholder="Search events..."
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
               className="pl-10 transition-all duration-200 focus:ring-2 focus:ring-blue-500/20 hover:border-blue-300" 
             />
           </div>
@@ -82,12 +123,13 @@ export default function EventFilters() {
             <div className="grid grid-cols-2 gap-2 md:space-y-2 md:grid-cols-1">
               {categories.map((category) => (
                 <Button
-                  key={category}
-                  variant={category === "All Events" ? "default" : "ghost"}
+                  key={category.value}
+                  onClick={() => onCategoryChange(category.value)}
+                  variant={selectedCategory === category.value ? "default" : "ghost"}
                   className="justify-start text-xs md:text-sm w-full hover:bg-blue-50 hover:text-blue-700 transition-colors duration-200"
                   size="sm"
                 >
-                  {category}
+                  {category.label}
                 </Button>
               ))}
             </div>
@@ -103,7 +145,8 @@ export default function EventFilters() {
               {quickFilters.map((filter) => (
                 <Button 
                   key={filter} 
-                  variant="ghost" 
+                  onClick={() => onQuickFilterChange(selectedQuickFilter === filter ? "" : filter)}
+                  variant={selectedQuickFilter === filter ? "default" : "ghost"}
                   className="justify-start text-xs md:text-sm w-full hover:bg-blue-50 hover:text-blue-700 transition-colors duration-200" 
                   size="sm"
                 >
@@ -130,7 +173,8 @@ export default function EventFilters() {
                 venues.map((venue) => (
                   <Button 
                     key={venue.id} 
-                    variant="ghost" 
+                    onClick={() => onVenueSelect(selectedVenueId === venue.id ? null : venue.id)}
+                    variant={selectedVenueId === venue.id ? "default" : "ghost"}
                     className="justify-start text-xs md:text-sm w-full hover:bg-blue-50 hover:text-blue-700 transition-colors duration-200 cursor-pointer" 
                     size="sm"
                   >

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Calendar, Home, Search, User, Bell, LogOut } from "lucide-react"
+import { Calendar, Home, Search, User, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/use-auth"
 import {
@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { NotificationsDropdown } from "@/components/notifications-dropdown"
 
 export function Navigation() {
   const { user, profile, logout } = useAuth()
@@ -76,12 +77,7 @@ export function Navigation() {
         <div className="flex items-center gap-4">
           {user ? (
             <>
-              <div className="relative cursor-pointer hover:opacity-80 transition-opacity">
-                <Bell className="w-5 h-5 text-gray-600" />
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-500 text-white text-xs rounded-full flex items-center justify-center">
-                  3
-                </span>
-              </div>
+              <NotificationsDropdown />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center gap-2 hover:bg-gray-100 cursor-pointer">
@@ -97,21 +93,13 @@ export function Navigation() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem className="cursor-pointer hover:bg-gray-50">
-                    <User className="w-4 h-4 mr-2" />
-                    Profile Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="cursor-pointer hover:bg-gray-50">
-                    <Bell className="w-4 h-4 mr-2" />
-                    Notifications
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/auth/login" className="cursor-pointer hover:bg-gray-50">
+                    <Link href={getDashboardLink()} className="cursor-pointer hover:bg-gray-50">
                       <User className="w-4 h-4 mr-2" />
-                      Sign In
+                      Profile Settings
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600 cursor-pointer hover:bg-red-50">
                     <LogOut className="w-4 h-4 mr-2" />
                     Sign Out

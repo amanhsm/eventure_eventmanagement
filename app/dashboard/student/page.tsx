@@ -2,7 +2,6 @@ import { Navigation } from "@/components/navigation"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { StudentStats } from "@/components/dashboard/student-stats"
 import { RegisteredEvents } from "@/components/dashboard/registered-events"
-import RegistrationReview from "@/components/dashboard/registration-review"
 import StudentProfile from "@/components/dashboard/student-profile"
 import { EventCalendar } from "@/components/dashboard/event-calendar"
 
@@ -16,10 +15,11 @@ export default function StudentDashboard() {
           <div className="lg:col-span-2 space-y-8">
             <StudentStats />
             <RegisteredEvents />
-            <EventCalendar userRole="student" showUserEventsOnly={true} />
+            <div data-calendar-section>
+              <EventCalendar userRole="student" showUserEventsOnly={true} />
+            </div>
           </div>
           <div className="space-y-8">
-            <RegistrationReview />
             <StudentProfile />
           </div>
         </div>

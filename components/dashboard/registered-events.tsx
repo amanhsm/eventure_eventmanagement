@@ -66,7 +66,6 @@ export function RegisteredEvents() {
           .single()
 
         if (studentError) {
-          console.error("[REGISTRATIONS] Error fetching student profile:", studentError)
           return
         }
 
@@ -106,10 +105,10 @@ export function RegisteredEvents() {
             )
           `)
           .eq("student_id", studentProfile.id)
+          .eq("status", "registered")
           .order("registration_date", { ascending: false })
 
         if (registrationsError) {
-          console.error("[REGISTRATIONS] Error fetching registrations:", registrationsError)
           throw new Error(`Failed to fetch registrations: ${registrationsError.message}`)
         }
 
@@ -125,10 +124,9 @@ export function RegisteredEvents() {
           }
         }))
 
-        console.log("[REGISTRATIONS] Fetched registrations:", transformedRegistrations)
         setRegistrations(transformedRegistrations)
       } catch (error: any) {
-        console.error("[REGISTRATIONS] Error fetching registrations:", error)
+        // Handle error gracefully
         setRegistrations([])
       } finally {
         setIsLoading(false)
@@ -139,19 +137,67 @@ export function RegisteredEvents() {
   }, [user?.id])
 
   const handleCancelRegistration = async (registrationId: number) => {
+    if (!confirm('Are you sure you want to cancel this registration?')) return
+    
     setIsCancelling(registrationId)
     try {
       const supabase = createClient()
+      
+      // Find the registration to get event details
+      const registration = registrations.find(reg => reg.id === registrationId)
+      if (!registration) {
+        throw new Error('Registration not found')
+      }
 
       // Update registration status to cancelled
-      const { error: updateError } = await supabase
+      const { data: updateData, error: updateError } = await supabase
         .from("event_registrations")
-        .update({ status: "cancelled" })
+        .update({ 
+          status: "cancelled",
+          cancelled_at: new Date().toISOString(),
+          cancellation_reason: "Cancelled by student"
+        })
         .eq("id", registrationId)
-
+        .select()
+        
       if (updateError) {
-        console.error("[REGISTRATIONS] Error cancelling registration:", updateError)
-        throw new Error(`Failed to cancel registration: ${updateError.message}`)
+        alert(`Failed to cancel registration: ${updateError.message}`)
+        return
+      }
+      
+      if (!updateData || updateData.length === 0) {
+        // Try using RPC function as fallback
+        const { data: rpcResult, error: rpcError } = await supabase
+          .rpc('cancel_registration_simple', {
+            p_registration_id: registrationId
+          })
+        
+        if (rpcError || !rpcResult?.success) {
+          alert(`Cancellation failed: ${rpcError?.message || rpcResult?.error || 'Unknown error'}`)
+          return
+        }
+        
+        // Skip participant count update since RPC handles it
+      } else {
+
+        // Decrement current_participants count for the event (only if direct update worked)
+        const { data: eventData, error: eventFetchError } = await supabase
+          .from('events')
+          .select('current_participants')
+          .eq('id', registration.events.id)
+          .single()
+
+        if (!eventFetchError && eventData) {
+          const newCount = Math.max(eventData.current_participants - 1, 0)
+          const { error: eventUpdateError } = await supabase
+            .from('events')
+            .update({ current_participants: newCount })
+            .eq('id', registration.events.id)
+
+          if (eventUpdateError) {
+            // Log error but don't fail the cancellation
+          }
+        }
       }
 
       // Remove registration from local state
@@ -159,9 +205,8 @@ export function RegisteredEvents() {
       setSelectedEvent(null)
       setNotification("Registration cancelled successfully!")
       setTimeout(() => setNotification(null), 3000)
-      console.log("[REGISTRATIONS] Registration cancelled successfully")
     } catch (error: any) {
-      console.error("[REGISTRATIONS] Error cancelling registration:", error)
+      // Handle cancellation error
       alert("Failed to cancel registration. Please try again.")
     } finally {
       setIsCancelling(null)
@@ -214,7 +259,12 @@ Status: ${event.status}
         <CardContent className="p-6 text-center">
           <h2 className="text-xl font-semibold mb-4">Registered Events</h2>
           <p className="text-gray-500 mb-4">You haven't registered for any events yet.</p>
-          <Button onClick={() => (window.location.href = "/browse")}>Browse Events</Button>
+          <Button 
+            onClick={() => (window.location.href = "/browse")}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            Browse Events
+          </Button>
         </CardContent>
       </Card>
     )
@@ -339,9 +389,8 @@ Status: ${event.status}
 
               <div className="flex gap-2 pt-4">
                 <Button
-                  variant="outline"
                   onClick={() => handleDownloadTicket(selectedEvent)}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   <Download className="h-4 w-4" />
                   Download Ticket
