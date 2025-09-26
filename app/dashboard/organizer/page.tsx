@@ -4,7 +4,6 @@ import { Navigation } from "@/components/navigation"
 import { OrganizerHeader } from "@/components/dashboard/organizer/organizer-header"
 import { OrganizerStats } from "@/components/dashboard/organizer/organizer-stats"
 import { EventManagement } from "@/components/dashboard/organizer/event-management"
-import { VenueBooking } from "@/components/dashboard/organizer/venue-booking"
 import { EventAnalytics } from "@/components/dashboard/organizer/event-analytics"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 
@@ -21,7 +20,6 @@ export default function OrganizerDashboard() {
               <EventManagement />
             </div>
             <div className="space-y-8">
-              <VenueBooking />
               <EventAnalytics />
             </div>
           </div>

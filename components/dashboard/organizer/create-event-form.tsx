@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { Calendar, MapPin, Users, Clock, CheckCircle, AlertCircle } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -42,8 +43,10 @@ export function CreateEventForm() {
     venueId: "",
     capacity: "",
     requirements: "",
+    hasRegistrationFee: false,
     registrationFee: "",
-    registrationDeadline: "",
+    registrationDeadlineDate: "",
+    registrationDeadlineTime: "23:59",
     maxRegistrations: "",
     eligibility: "",
     contactPerson: "",
@@ -100,14 +103,22 @@ export function CreateEventForm() {
     setVenueBookingStatus(conflicts && conflicts.length > 0 ? "unavailable" : "available")
   }
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
 
     if (field === "venueId") {
       const venue = venues.find((v) => v.id === value)
       setSelectedVenue(venue || null)
       if (venue) {
-        setFormData((prev) => ({ ...prev, capacity: venue.capacity.toString() }))
+        setFormData((prev) => ({ ...prev, capacity: Math.min(venue.capacity, 500).toString() }))
+      }
+    }
+    
+    // Validate capacity doesn't exceed 500
+    if (field === "capacity" && typeof value === "string") {
+      const numValue = parseInt(value)
+      if (numValue > 500) {
+        setFormData((prev) => ({ ...prev, capacity: "500" }))
       }
     }
   }
@@ -127,9 +138,9 @@ export function CreateEventForm() {
         venue_id: formData.venueId || null,
         start_date: `${formData.date}T${formData.startTime}:00`,
         end_date: `${formData.date}T${formData.endTime}:00`,
-        registration_deadline: formData.registrationDeadline ? `${formData.registrationDeadline}T23:59:59` : null,
+        registration_deadline: formData.registrationDeadlineDate ? `${formData.registrationDeadlineDate}T${formData.registrationDeadlineTime}:00` : null,
         max_participants: formData.maxRegistrations ? Number.parseInt(formData.maxRegistrations) : null,
-        registration_fee: formData.registrationFee ? Number.parseFloat(formData.registrationFee) : 0,
+        registration_fee: formData.hasRegistrationFee && formData.registrationFee ? Number.parseFloat(formData.registrationFee) : 0,
         requirements: formData.requirements,
         status: "draft",
       }
@@ -162,9 +173,9 @@ export function CreateEventForm() {
         venue_id: formData.venueId || null,
         start_date: `${formData.date}T${formData.startTime}:00`,
         end_date: `${formData.date}T${formData.endTime}:00`,
-        registration_deadline: formData.registrationDeadline ? `${formData.registrationDeadline}T23:59:59` : null,
+        registration_deadline: formData.registrationDeadlineDate ? `${formData.registrationDeadlineDate}T${formData.registrationDeadlineTime}:00` : null,
         max_participants: formData.maxRegistrations ? Number.parseInt(formData.maxRegistrations) : null,
-        registration_fee: formData.registrationFee ? Number.parseFloat(formData.registrationFee) : 0,
+        registration_fee: formData.hasRegistrationFee && formData.registrationFee ? Number.parseFloat(formData.registrationFee) : 0,
         requirements: formData.requirements,
         status: "pending_approval",
         approval_status: "pending",
@@ -264,27 +275,50 @@ export function CreateEventForm() {
               <Input
                 id="date"
                 type="date"
+                min={new Date().toISOString().split('T')[0]}
                 value={formData.date}
                 onChange={(e) => handleInputChange("date", e.target.value)}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="start-time">Start Time *</Label>
-              <Input
-                id="start-time"
-                type="time"
-                value={formData.startTime}
-                onChange={(e) => handleInputChange("startTime", e.target.value)}
-              />
+              <Select value={formData.startTime} onValueChange={(value) => handleInputChange("startTime", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select start time" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 24 }, (_, i) => {
+                    const hour = Math.floor(i / 2) + 6; // Start from 6 AM (06:00)
+                    const minute = i % 2 === 0 ? "00" : "30";
+                    const time = `${hour.toString().padStart(2, "0")}:${minute}`;
+                    return (
+                      <SelectItem key={time} value={time}>
+                        {time}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="end-time">End Time *</Label>
-              <Input
-                id="end-time"
-                type="time"
-                value={formData.endTime}
-                onChange={(e) => handleInputChange("endTime", e.target.value)}
-              />
+              <Select value={formData.endTime} onValueChange={(value) => handleInputChange("endTime", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select end time" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 24 }, (_, i) => {
+                    const hour = Math.floor(i / 2) + 6; // Start from 6 AM (06:00)
+                    const minute = i % 2 === 0 ? "00" : "30";
+                    const time = `${hour.toString().padStart(2, "0")}:${minute}`;
+                    return (
+                      <SelectItem key={time} value={time}>
+                        {time}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
@@ -322,9 +356,16 @@ export function CreateEventForm() {
                 placeholder="Number of attendees"
                 value={formData.capacity}
                 onChange={(e) => handleInputChange("capacity", e.target.value)}
-                max={selectedVenue?.capacity}
+                max={selectedVenue ? Math.min(selectedVenue.capacity, 500) : 500}
+                min="1"
               />
-              {selectedVenue && <p className="text-sm text-gray-600">Maximum capacity: {selectedVenue.capacity}</p>}
+              {selectedVenue && (
+                <p className="text-sm text-gray-600">
+                  Maximum capacity: {Math.min(selectedVenue.capacity, 500)} people
+                  {selectedVenue.capacity > 500 && " (Limited to 500 for this form)"}
+                </p>
+              )}
+              {!selectedVenue && <p className="text-sm text-gray-600">Maximum allowed: 500 people</p>}
             </div>
           </div>
 
@@ -394,36 +435,81 @@ export function CreateEventForm() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="registration-fee">Registration Fee</Label>
-              <Input
-                id="registration-fee"
-                type="number"
-                placeholder="₹0"
-                value={formData.registrationFee}
-                onChange={(e) => handleInputChange("registrationFee", e.target.value)}
+          <div className="space-y-6">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="has-registration-fee"
+                checked={formData.hasRegistrationFee}
+                onCheckedChange={(checked) => handleInputChange("hasRegistrationFee", checked)}
               />
+              <Label htmlFor="has-registration-fee">This event has a registration fee</Label>
             </div>
+            
+            {formData.hasRegistrationFee && (
+              <div className="space-y-2">
+                <Label htmlFor="registration-fee">Registration Fee Amount *</Label>
+                <Input
+                  id="registration-fee"
+                  type="number"
+                  placeholder="₹0"
+                  value={formData.registrationFee}
+                  onChange={(e) => handleInputChange("registrationFee", e.target.value)}
+                  min="0"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="registration-deadline">Registration Deadline *</Label>
+              <Label htmlFor="registration-deadline-date">Registration Deadline Date *</Label>
               <Input
-                id="registration-deadline"
+                id="registration-deadline-date"
                 type="date"
-                value={formData.registrationDeadline}
-                onChange={(e) => handleInputChange("registrationDeadline", e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                max={formData.date || undefined}
+                value={formData.registrationDeadlineDate}
+                onChange={(e) => handleInputChange("registrationDeadlineDate", e.target.value)}
               />
+              {formData.date && (
+                <p className="text-sm text-gray-600">
+                  Must be before event date ({formData.date})
+                </p>
+              )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="max-registrations">Max Registrations</Label>
-              <Input
-                id="max-registrations"
-                type="number"
-                placeholder="Leave empty for no limit"
-                value={formData.maxRegistrations}
-                onChange={(e) => handleInputChange("maxRegistrations", e.target.value)}
-              />
+              <Label htmlFor="registration-deadline-time">Registration Deadline Time *</Label>
+              <Select value={formData.registrationDeadlineTime} onValueChange={(value) => handleInputChange("registrationDeadlineTime", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select deadline time" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 24 }, (_, i) => {
+                    const hour = Math.floor(i / 2) + 6; // Start from 6 AM (06:00)
+                    const minute = i % 2 === 0 ? "00" : "30";
+                    const time = `${hour.toString().padStart(2, "0")}:${minute}`;
+                    return (
+                      <SelectItem key={time} value={time}>
+                        {time}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="max-registrations">Max Registrations</Label>
+            <Input
+              id="max-registrations"
+              type="number"
+              placeholder="Leave empty for no limit"
+              value={formData.maxRegistrations}
+              onChange={(e) => handleInputChange("maxRegistrations", e.target.value)}
+              max="500"
+              min="1"
+            />
           </div>
 
           <div className="space-y-2">

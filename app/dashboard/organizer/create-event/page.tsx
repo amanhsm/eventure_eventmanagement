@@ -1,5 +1,5 @@
 import { Navigation } from "@/components/navigation"
-import { CreateEventForm } from "@/components/dashboard/organizer/create-event-form"
+import EventCreationForm from "@/components/dashboard/organizer/event-creation-form"
 
 export default function CreateEventPage() {
   return (
@@ -11,7 +11,7 @@ export default function CreateEventPage() {
             <h1 className="text-3xl font-bold text-gray-900">Create New Event</h1>
             <p className="text-gray-600 mt-1">Fill in the details to create and submit your event for approval</p>
           </div>
-          <CreateEventForm />
+          <EventCreationForm />
         </div>
       </main>
     </div>

@@ -208,22 +208,44 @@ export default function VenueSelector({
 
           <div className="space-y-2">
             <Label>Start Time</Label>
-            <Input
-              type="time"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              className="cursor-pointer"
-            />
+            <Select value={startTime} onValueChange={setStartTime}>
+              <SelectTrigger className="cursor-pointer">
+                <SelectValue placeholder="Select start time" />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 24 }, (_, i) => {
+                  const hour = Math.floor(i / 2) + 6; // Start from 6 AM (06:00)
+                  const minute = i % 2 === 0 ? "00" : "30";
+                  const time = `${hour.toString().padStart(2, "0")}:${minute}`;
+                  return (
+                    <SelectItem key={time} value={time}>
+                      {time}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
             <Label>End Time</Label>
-            <Input
-              type="time"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-              className="cursor-pointer"
-            />
+            <Select value={endTime} onValueChange={setEndTime}>
+              <SelectTrigger className="cursor-pointer">
+                <SelectValue placeholder="Select end time" />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 24 }, (_, i) => {
+                  const hour = Math.floor(i / 2) + 6; // Start from 6 AM (06:00)
+                  const minute = i % 2 === 0 ? "00" : "30";
+                  const time = `${hour.toString().padStart(2, "0")}:${minute}`;
+                  return (
+                    <SelectItem key={time} value={time}>
+                      {time}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -252,9 +274,16 @@ export default function VenueSelector({
               type="number"
               placeholder="Enter minimum capacity"
               value={minCapacity}
-              onChange={(e) => setMinCapacity(e.target.value)}
+              onChange={(e) => {
+                const value = parseInt(e.target.value);
+                if (value <= 500 || e.target.value === "") {
+                  setMinCapacity(e.target.value);
+                }
+              }}
+              max="500"
               className="cursor-pointer"
             />
+            <p className="text-xs text-gray-500">Maximum capacity allowed: 500</p>
           </div>
         </div>
 

@@ -30,10 +30,11 @@ export function EventApprovals() {
         .from("events")
         .select(`
           *,
-          organizer:profiles!events_organizer_id_fkey(full_name, email),
-          venue:venues(venue_name, blocks(block_name))
+          organizers!events_organizer_id_fkey(name, user_id, users!organizers_user_id_fkey(email)),
+          venues(venue_name, block_id, blocks!venues_block_id_fkey(block_name))
         `)
-        .eq("status", "pending")
+        .eq("status", "pending_approval")
+        .eq("approval_status", "pending")
         .order("created_at", { ascending: false })
 
       if (error) throw error
@@ -88,7 +89,11 @@ export function EventApprovals() {
 
         const { error } = await supabase
           .from("events")
-          .update({ status: "approved", approved_at: new Date().toISOString() })
+          .update({ 
+            status: "approved", 
+            approval_status: "approved",
+            approved_at: new Date().toISOString() 
+          })
           .eq("id", eventId)
 
         if (error) throw error
@@ -110,7 +115,11 @@ export function EventApprovals() {
 
         const { error } = await supabase
           .from("events")
-          .update({ status: "rejected", rejected_at: new Date().toISOString() })
+          .update({ 
+            status: "rejected", 
+            approval_status: "rejected",
+            rejected_at: new Date().toISOString() 
+          })
           .eq("id", eventId)
 
         if (error) throw error
@@ -145,7 +154,8 @@ export function EventApprovals() {
       const { error } = await supabase
         .from("events")
         .update({
-          status: "changes_requested",
+          status: "pending_approval",
+          approval_status: "changes_requested",
           admin_feedback: feedbackText,
           feedback_at: new Date().toISOString(),
         })
@@ -202,7 +212,7 @@ export function EventApprovals() {
                           {event.priority || "medium"} priority
                         </Badge>
                       </div>
-                      <p className="text-sm text-gray-600 mb-1">by {event.organizer?.full_name || "Unknown"}</p>
+                      <p className="text-sm text-gray-600 mb-1">by {event.organizers?.name || "Unknown"}</p>
                       <p className="text-xs text-gray-500">
                         Submitted on {new Date(event.created_at).toLocaleDateString()}
                       </p>
@@ -289,7 +299,7 @@ export function EventApprovals() {
             <div className="space-y-4">
               <div>
                 <h3 className="font-semibold text-lg">{selectedEvent.title}</h3>
-                <p className="text-sm text-gray-600">by {selectedEvent.organizer?.full_name}</p>
+                <p className="text-sm text-gray-600">by {selectedEvent.organizers?.name}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -326,7 +336,7 @@ export function EventApprovals() {
 
               <div>
                 <Label className="font-medium">Contact</Label>
-                <p className="text-sm mt-1">{selectedEvent.organizer?.email}</p>
+                <p className="text-sm mt-1">{selectedEvent.organizers?.users?.email}</p>
               </div>
 
               <div className="flex gap-2 pt-4">

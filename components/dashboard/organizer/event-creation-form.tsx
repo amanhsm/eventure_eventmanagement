@@ -1,15 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { Calendar, Plus, ArrowLeft, ArrowRight } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
+import { createClient } from "@/lib/supabase/client"
 import VenueSelector from "./venue-selector"
 
 interface Venue {
@@ -34,6 +35,8 @@ export default function EventCreationForm() {
   const [currentStep, setCurrentStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [categories, setCategories] = useState<EventCategory[]>([])
+  const [organizerId, setOrganizerId] = useState<number | null>(null)
+  const [organizerLoading, setOrganizerLoading] = useState(true)
   
   // Venue and schedule data
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null)
@@ -47,11 +50,49 @@ export default function EventCreationForm() {
     description: "",
     category_id: "",
     max_participants: "",
-    registration_deadline: "",
+    registration_deadline_date: "",
+    registration_deadline_time: "23:59",
+    hasRegistrationFee: false,
     registration_fee: "0"
   })
 
   const supabase = createClient()
+
+  // Fetch organizer ID on component mount
+  useEffect(() => {
+    const fetchOrganizerId = async () => {
+      if (!user) {
+        setOrganizerLoading(false)
+        return
+      }
+      
+      try {
+        console.log('Fetching organizer for user ID:', user.id)
+        const { data, error } = await supabase
+          .from('organizers')
+          .select('id')
+          .eq('user_id', user.id)
+          .single()
+        
+        if (error) {
+          console.error('Error fetching organizer:', error)
+          alert('Error: Organizer profile not found. Please contact administrator to set up your organizer profile.')
+          setOrganizerLoading(false)
+          return
+        }
+        
+        setOrganizerId(data.id)
+        console.log('Organizer ID fetched successfully:', data.id)
+        setOrganizerLoading(false)
+      } catch (error) {
+        console.error('Error fetching organizer ID:', error)
+        alert('Error: Could not fetch organizer profile. Please try refreshing the page.')
+        setOrganizerLoading(false)
+      }
+    }
+
+    fetchOrganizerId()
+  }, [user, supabase])
 
   const handleVenueSelect = (venue: Venue, date: Date, start: string, end: string) => {
     setSelectedVenue(venue)
@@ -82,7 +123,7 @@ export default function EventCreationForm() {
     }
   }
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -90,7 +131,7 @@ export default function EventCreationForm() {
   }
 
   const validateStep1 = () => {
-    return selectedVenue && eventDate && startTime && endTime
+    return selectedVenue && eventDate && startTime && endTime && organizerId
   }
 
   const validateStep2 = () => {
@@ -99,40 +140,65 @@ export default function EventCreationForm() {
       formData.description.trim() &&
       formData.category_id &&
       formData.max_participants &&
-      formData.registration_deadline &&
+      formData.registration_deadline_date &&
       parseInt(formData.max_participants) <= (selectedVenue?.max_capacity || 0)
     )
   }
 
-  const handleSubmit = async () => {
-    if (!user || !selectedVenue || !eventDate) return
+  const handleSubmit = async (isDraft = false) => {
+    if (!organizerId) {
+      alert('Organizer ID not found. Please refresh and try again.')
+      return
+    }
 
+    // For drafts, we need at least a title
+    if (isDraft && !formData.title.trim()) {
+      alert('Please enter a title to save as draft.')
+      return
+    }
+
+    // For submission, we need all required fields
+    if (!isDraft && (!user || !selectedVenue || !eventDate || !validateStep2())) {
+      console.log('Submit validation failed:', { user: !!user, selectedVenue: !!selectedVenue, eventDate: !!eventDate, formValid: validateStep2() })
+      alert('Please fill in all required fields before submitting.')
+      return
+    }
+
+    console.log(`${isDraft ? 'Saving draft' : 'Submitting event'} with organizer ID:`, organizerId)
     setIsSubmitting(true)
     try {
       const eventData = {
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        category_id: parseInt(formData.category_id),
-        event_date: eventDate.toISOString().split('T')[0],
-        start_time: startTime,
-        end_time: endTime,
-        venue_id: selectedVenue.id,
-        organizer_id: user.id,
-        max_participants: parseInt(formData.max_participants),
+        title: formData.title.trim() || 'Untitled Event',
+        description: formData.description.trim() || '',
+        category_id: formData.category_id ? parseInt(formData.category_id) : null,
+        event_date: eventDate ? eventDate.toISOString().split('T')[0] : null,
+        start_time: startTime || null,
+        end_time: endTime || null,
+        venue_id: selectedVenue?.id || null,
+        organizer_id: organizerId,
+        max_participants: formData.max_participants ? parseInt(formData.max_participants) : null,
         current_participants: 0,
-        registration_deadline: formData.registration_deadline,
-        registration_fee: parseFloat(formData.registration_fee),
-        status: 'pending',
+        registration_deadline: formData.registration_deadline_date ? `${formData.registration_deadline_date}T${formData.registration_deadline_time}:00` : null,
+        registration_fee: formData.hasRegistrationFee ? parseFloat(formData.registration_fee) : 0,
+        status: isDraft ? 'draft' : 'pending_approval',
+        approval_status: isDraft ? 'pending' : 'pending',
         cancellation_allowed: true
       }
 
+      console.log('Event data to be inserted:', eventData)
+      
       const { error } = await supabase
         .from('events')
         .insert([eventData])
 
       if (error) throw error
 
-      alert('Event created successfully! It will be reviewed by administrators.')
+      alert(isDraft ? 'Event saved as draft!' : 'Event submitted successfully! It will be reviewed by administrators.')
+      
+      // Refresh the page to show the new event
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
       
       // Reset form
       setCurrentStep(1)
@@ -145,7 +211,9 @@ export default function EventCreationForm() {
         description: "",
         category_id: "",
         max_participants: "",
-        registration_deadline: "",
+        registration_deadline_date: "",
+        registration_deadline_time: "23:59",
+        hasRegistrationFee: false,
         registration_fee: "0"
       })
 
@@ -264,7 +332,7 @@ export default function EventCreationForm() {
                     <SelectContent>
                       {categories.map((category) => (
                         <SelectItem key={category.id} value={category.id.toString()}>
-                          {category.name}
+                          {category.name.charAt(0).toUpperCase() + category.name.slice(1)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -277,43 +345,92 @@ export default function EventCreationForm() {
                     id="max_participants"
                     type="number"
                     value={formData.max_participants}
-                    onChange={(e) => handleInputChange('max_participants', e.target.value)}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value);
+                      if (value <= 500 || e.target.value === "") {
+                        handleInputChange('max_participants', e.target.value);
+                      }
+                    }}
                     placeholder="Enter max participants"
-                    max={selectedVenue?.max_capacity}
+                    max={selectedVenue ? Math.min(selectedVenue.max_capacity, 500) : 500}
+                    min="1"
                     className="cursor-pointer"
                   />
                   {selectedVenue && (
                     <p className="text-xs text-gray-500">
-                      Venue capacity: {selectedVenue.max_capacity}
+                      Venue capacity: {Math.min(selectedVenue.max_capacity, 500)} (Limited to 500 max)
+                      {selectedVenue.max_capacity > 500 && " - Venue capacity exceeds limit"}
                     </p>
                   )}
+                  {!selectedVenue && <p className="text-xs text-gray-500">Maximum allowed: 500 participants</p>}
                 </div>
               </div>
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="registration_deadline">Registration Deadline *</Label>
+                  <Label htmlFor="registration_deadline_date">Registration Deadline Date *</Label>
                   <Input
-                    id="registration_deadline"
-                    type="datetime-local"
-                    value={formData.registration_deadline}
-                    onChange={(e) => handleInputChange('registration_deadline', e.target.value)}
+                    id="registration_deadline_date"
+                    type="date"
+                    min={new Date().toISOString().split('T')[0]}
+                    max={eventDate ? eventDate.toISOString().split('T')[0] : undefined}
+                    value={formData.registration_deadline_date}
+                    onChange={(e) => handleInputChange('registration_deadline_date', e.target.value)}
                     className="cursor-pointer"
                   />
+                  {eventDate && (
+                    <p className="text-xs text-gray-500">
+                      Must be before event date ({eventDate.toLocaleDateString()})
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="registration_fee">Registration Fee (₹)</Label>
-                  <Input
-                    id="registration_fee"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.registration_fee}
-                    onChange={(e) => handleInputChange('registration_fee', e.target.value)}
-                    placeholder="0.00"
-                    className="cursor-pointer"
-                  />
+                  <Label htmlFor="registration_deadline_time">Registration Deadline Time *</Label>
+                  <Select value={formData.registration_deadline_time} onValueChange={(value) => handleInputChange('registration_deadline_time', value)}>
+                    <SelectTrigger className="cursor-pointer">
+                      <SelectValue placeholder="Select deadline time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 24 }, (_, i) => {
+                        const hour = Math.floor(i / 2) + 6; // Start from 6 AM (06:00)
+                        const minute = i % 2 === 0 ? "00" : "30";
+                        const time = `${hour.toString().padStart(2, "0")}:${minute}`;
+                        return (
+                          <SelectItem key={time} value={time}>
+                            {time}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="has-registration-fee"
+                      checked={formData.hasRegistrationFee}
+                      onCheckedChange={(checked) => handleInputChange('hasRegistrationFee', checked)}
+                    />
+                    <Label htmlFor="has-registration-fee">This event has a registration fee</Label>
+                  </div>
+                  
+                  {formData.hasRegistrationFee && (
+                    <div className="space-y-2">
+                      <Label htmlFor="registration_fee">Registration Fee Amount (₹) *</Label>
+                      <Input
+                        id="registration_fee"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.registration_fee}
+                        onChange={(e) => handleInputChange('registration_fee', e.target.value)}
+                        placeholder="0.00"
+                        className="cursor-pointer"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -333,21 +450,46 @@ export default function EventCreationForm() {
             <div className="flex justify-between">
               <Button
                 variant="outline"
-                onClick={prevStep}
+                onClick={() => setCurrentStep(1)}
                 className="cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Venue
               </Button>
 
-              <Button
-                onClick={handleSubmit}
-                disabled={!validateStep2() || isSubmitting}
-                className="bg-[#799EFF] hover:bg-[#6B8EFF] text-white cursor-pointer"
-              >
-                {isSubmitting ? "Creating Event..." : "Create Event"}
-                <Plus className="w-4 h-4 ml-2" />
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => handleSubmit(true)}
+                  disabled={!formData.title.trim() || isSubmitting || organizerLoading}
+                  className="cursor-pointer"
+                >
+                  {isSubmitting ? "Saving..." : "Save as Draft"}
+                </Button>
+                
+                <Button
+                  onClick={() => handleSubmit(false)}
+                  disabled={!validateStep2() || isSubmitting || organizerLoading}
+                  className="bg-[#799EFF] hover:bg-[#6B8EFF] text-white cursor-pointer"
+                >
+                  {organizerLoading ? "Loading..." : isSubmitting ? "Creating Event..." : "Submit for Approval"}
+                  <Plus className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            </div>
+            
+            {/* Debug info - remove in production */}
+            <div className="mt-4 p-3 bg-gray-100 rounded text-sm">
+              <strong>Debug Info:</strong><br/>
+              Organizer ID: {organizerId || 'Not loaded'}<br/>
+              Organizer Loading: {organizerLoading ? 'Yes' : 'No'}<br/>
+              Form Valid: {validateStep2() ? 'Yes' : 'No'}<br/>
+              User ID: {user?.id || 'No user'}<br/>
+              Title: {formData.title || 'Empty'}<br/>
+              Category: {formData.category_id || 'Empty'}<br/>
+              Description: {formData.description ? 'Filled' : 'Empty'}<br/>
+              Max Participants: {formData.max_participants || 'Empty'}<br/>
+              Registration Deadline Date: {formData.registration_deadline_date || 'Empty'}
             </div>
           </CardContent>
         </Card>
