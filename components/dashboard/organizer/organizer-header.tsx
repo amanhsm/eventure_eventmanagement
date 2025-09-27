@@ -16,7 +16,7 @@ export function OrganizerHeader() {
     <div className="flex items-center justify-between">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Organizer Dashboard</h1>
-        <p className="text-gray-600 mt-1">Manage your events, venues, and registrations</p>
+        <p className="text-gray-600 mt-1">Manage your events and registrations</p>
       </div>
       <div className="flex gap-3">
         <Button variant="outline" className="flex items-center gap-2 bg-white hover:bg-gray-50 border-gray-300 cursor-pointer" onClick={handleSettings}>

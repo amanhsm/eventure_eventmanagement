@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
-import { Calendar, Users, TrendingUp, MapPin, AlertTriangle, CheckCircle } from "lucide-react"
+import { Calendar, Users, AlertTriangle } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { createClient } from "@/lib/supabase/client"
 
@@ -11,7 +11,6 @@ export function AdminStats() {
     totalEvents: 0,
     pendingApprovals: 0,
     activeUsers: 0,
-    systemUptime: "94%",
   })
   const [loading, setLoading] = useState(true)
 
@@ -40,14 +39,10 @@ export function AdminStats() {
           .select("id", { count: "exact" })
           .gte("last_login", thirtyDaysAgo.toISOString())
 
-        // Calculate system uptime (simplified - based on successful operations)
-        const systemUptime = "99.2%"
-
         const statsData = {
           totalEvents: totalEventsCount || 0,
           pendingApprovals: pendingApprovalsCount || 0,
           activeUsers: activeUsersCount || 0,
-          systemUptime,
         }
 
         console.log("[STATS] Fetched admin stats:", statsData)
@@ -103,8 +98,6 @@ export function AdminStats() {
       label: "Total Events",
       color: "text-blue-600",
       bgColor: "bg-blue-100",
-      change: "+12 this month",
-      trend: "up",
     },
     {
       icon: AlertTriangle,
@@ -112,8 +105,6 @@ export function AdminStats() {
       label: "Pending Approvals",
       color: "text-yellow-600",
       bgColor: "bg-yellow-100",
-      change: "3 urgent",
-      trend: "neutral",
     },
     {
       icon: Users,
@@ -121,22 +112,11 @@ export function AdminStats() {
       label: "Active Users",
       color: "text-green-600",
       bgColor: "bg-green-100",
-      change: "+234 this week",
-      trend: "up",
-    },
-    {
-      icon: CheckCircle,
-      value: stats.systemUptime,
-      label: "System Uptime",
-      color: "text-purple-600",
-      bgColor: "bg-purple-100",
-      change: "99.9% target",
-      trend: "up",
     },
   ]
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {statsData.map((stat, index) => (
         <Card key={index}>
           <CardContent className="p-6">
@@ -149,7 +129,6 @@ export function AdminStats() {
                 <p className="text-sm text-gray-600">{stat.label}</p>
               </div>
             </div>
-            <p className="text-xs text-gray-500">{stat.change}</p>
           </CardContent>
         </Card>
       ))}

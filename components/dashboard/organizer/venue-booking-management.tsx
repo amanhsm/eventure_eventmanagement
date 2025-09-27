@@ -1,8 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Clock, Users, Edit, Trash2, Plus } from "lucide-react"
-import Link from "next/link"
+import { Calendar, Clock, Users, Edit, Trash2 } from "lucide-react"
 
 export function VenueBookingManagement() {
   const bookings = [
@@ -58,14 +57,6 @@ export function VenueBookingManagement() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <Link href="/venues">
-          <Button className="bg-blue-600 hover:bg-blue-700 flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Book New Venue
-          </Button>
-        </Link>
-      </div>
 
       <Card>
         <CardHeader>
@@ -81,7 +72,7 @@ export function VenueBookingManagement() {
                     <p className="text-sm text-gray-600">at {booking.venue}</p>
                   </div>
                   <div className="text-right">
-                    <Badge className={getStatusColor(booking.status)} size="sm">
+                    <Badge className={getStatusColor(booking.status)}>
                       {booking.status}
                     </Badge>
                     <p className="text-lg font-semibold text-gray-900 mt-1">{booking.cost}</p>

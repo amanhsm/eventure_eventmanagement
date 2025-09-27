@@ -47,13 +47,6 @@ export function SystemOverview() {
       type: "user",
     },
     {
-      id: 3,
-      action: "Venue Booking",
-      details: "Main Auditorium reserved",
-      time: "1 hour ago",
-      type: "venue",
-    },
-    {
       id: 4,
       action: "System Backup",
       details: "Daily backup completed",
@@ -81,8 +74,6 @@ export function SystemOverview() {
         return "text-green-600"
       case "user":
         return "text-blue-600"
-      case "venue":
-        return "text-purple-600"
       case "system":
         return "text-gray-600"
       default:
@@ -111,7 +102,7 @@ export function SystemOverview() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-gray-900">{metric.value}</span>
-                    <Badge className={getStatusColor(metric.status)} size="sm">
+                    <Badge className={getStatusColor(metric.status)}>
                       {metric.status}
                     </Badge>
                   </div>

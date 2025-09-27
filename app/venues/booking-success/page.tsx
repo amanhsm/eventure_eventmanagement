@@ -39,14 +39,9 @@ export default function BookingSuccessPage() {
                 </div>
               </div>
 
-              <div className="flex gap-4">
-                <Link href="/dashboard/organizer/venues" className="flex-1">
-                  <Button className="w-full bg-blue-600 hover:bg-blue-700">View My Bookings</Button>
-                </Link>
-                <Link href="/venues" className="flex-1">
-                  <Button variant="outline" className="w-full bg-transparent">
-                    Book Another Venue
-                  </Button>
+              <div className="flex justify-center">
+                <Link href="/dashboard/organizer">
+                  <Button className="bg-blue-600 hover:bg-blue-700">Go to Dashboard</Button>
                 </Link>
               </div>
             </CardContent>

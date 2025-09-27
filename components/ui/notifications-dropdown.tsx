@@ -8,6 +8,7 @@ import { Bell, Check, CheckCheck, X } from "lucide-react"
 import { notificationService, type Notification } from "@/lib/services/notification-service"
 import { useAuth } from "@/hooks/use-auth"
 import { formatDistanceToNow } from "date-fns"
+import { useRouter } from "next/navigation"
 
 interface NotificationsDropdownProps {
   className?: string
@@ -15,6 +16,7 @@ interface NotificationsDropdownProps {
 
 export function NotificationsDropdown({ className }: NotificationsDropdownProps) {
   const { user } = useAuth()
+  const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -82,6 +84,62 @@ export function NotificationsDropdown({ className }: NotificationsDropdownProps)
       setUnreadCount(0)
     } catch (error) {
       console.error('Error marking all notifications as read:', error)
+    }
+  }
+
+  const handleNotificationClick = (notification: Notification) => {
+    // Mark as read if not already read
+    if (!notification.is_read) {
+      handleMarkAsRead(notification.id)
+    }
+
+    // Close the dropdown
+    setIsOpen(false)
+
+    // Navigate based on notification type and user role
+    if (!notification.related_event_id) return
+
+    const eventId = notification.related_event_id
+
+    switch (notification.type) {
+      case 'new_event':
+        // Student: Go to event details page
+        if (user?.role === 'student') {
+          router.push(`/events/${eventId}`)
+        }
+        break
+
+      case 'event_changes_requested':
+        // Organizer: Go to change request page
+        if (user?.role === 'organizer') {
+          router.push(`/dashboard/organizer/events/${eventId}/change-request`)
+        }
+        break
+
+      case 'event_approved':
+      case 'event_rejected':
+        // Organizer: Go to event details in organizer dashboard
+        if (user?.role === 'organizer') {
+          router.push(`/dashboard/organizer/events/${eventId}`)
+        }
+        break
+
+      case 'new_event_submission':
+        // Admin: Go to admin dashboard (event approvals section)
+        if (user?.role === 'admin') {
+          router.push('/dashboard/admin')
+        }
+        break
+
+      default:
+        // Fallback: go to appropriate dashboard
+        if (user?.role === 'student') {
+          router.push('/dashboard/student')
+        } else if (user?.role === 'organizer') {
+          router.push('/dashboard/organizer')
+        } else if (user?.role === 'admin') {
+          router.push('/dashboard/admin')
+        }
     }
   }
 
@@ -201,11 +259,7 @@ export function NotificationsDropdown({ className }: NotificationsDropdownProps)
                         p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors
                         ${!notification.is_read ? 'bg-blue-50' : ''}
                       `}
-                      onClick={() => {
-                        if (!notification.is_read) {
-                          handleMarkAsRead(notification.id)
-                        }
-                      }}
+                      onClick={() => handleNotificationClick(notification)}
                     >
                       <div className="flex items-start gap-3">
                         <div className="text-lg">

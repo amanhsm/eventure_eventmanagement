@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
-import { Calendar, Users, TrendingUp, MapPin } from "lucide-react"
+import { Calendar, Users, TrendingUp } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { createClient } from "@/lib/supabase/client"
 
@@ -11,7 +11,6 @@ export function OrganizerStats() {
   const [stats, setStats] = useState({
     activeEvents: 0,
     totalRegistrations: 0,
-    venuesBooked: 0,
   })
   const [isLoading, setIsLoading] = useState(true)
 
@@ -62,19 +61,9 @@ export function OrganizerStats() {
           .eq("organizer_id", organizerProfile.id)
           .eq("status", "approved")
 
-        // Get venues booked count (distinct venues used by organizer)
-        const { data: venuesData } = await supabase
-          .from("events")
-          .select("venue_id")
-          .eq("organizer_id", organizerProfile.id)
-          .not("venue_id", "is", null)
-
-        const uniqueVenues = new Set(venuesData?.map(event => event.venue_id) || [])
-
         const statsData = {
           activeEvents: activeEventsCount || 0,
           totalRegistrations: totalRegistrationsCount || 0,
-          venuesBooked: uniqueVenues.size,
         }
 
         console.log("[STATS] Fetched organizer stats:", statsData)
@@ -138,17 +127,10 @@ export function OrganizerStats() {
       color: "text-green-600",
       bgColor: "bg-green-100",
     },
-    {
-      icon: MapPin,
-      value: isLoading ? "..." : stats.venuesBooked.toString(),
-      label: "Venues Booked",
-      color: "text-purple-600",
-      bgColor: "bg-purple-100",
-    },
   ]
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {statsData.map((stat, index) => (
         <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer">
           <CardContent className="p-6">
