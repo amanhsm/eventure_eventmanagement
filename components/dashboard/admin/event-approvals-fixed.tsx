@@ -43,7 +43,7 @@ export function EventApprovals() {
 
       setPendingEvents(events || [])
     } catch (error) {
-      console.error("Error fetching pending events:", error)
+      console.error("[v0] Error fetching pending events:", error)
       showToast("Error", "Failed to load pending events", "error")
     } finally {
       setLoading(false)
@@ -82,6 +82,7 @@ export function EventApprovals() {
     const event = pendingEvents.find((e) => e.id === eventId)
     setSelectedEvent(event)
     setShowDetailsModal(true)
+    console.log(`[v0] Viewing details for event ${eventId}`)
   }
 
   const handleApprove = async (eventId: string) => {
@@ -98,10 +99,11 @@ export function EventApprovals() {
 
       if (error) throw error
 
+      console.log(`[v0] Event ${eventId} approved successfully`)
       showToast("Success", "Event approved successfully!", "success")
-      fetchPendingEvents()
+      fetchPendingEvents() // Refresh the list
     } catch (error) {
-      console.error("Error approving event:", error)
+      console.error("[v0] Error approving event:", error)
       showToast("Error", "Failed to approve event. Please try again.", "error")
     }
   }
@@ -121,10 +123,11 @@ export function EventApprovals() {
 
       if (error) throw error
 
+      console.log(`[v0] Rejected event ${eventId}`)
       showToast("Success", "Event rejected successfully!", "success")
-      fetchPendingEvents()
+      fetchPendingEvents() // Refresh the list
     } catch (error) {
-      console.error("Error rejecting event:", error)
+      console.error("[v0] Error rejecting event:", error)
       showToast("Error", "Failed to reject event. Please try again.", "error")
     }
   }
@@ -134,6 +137,7 @@ export function EventApprovals() {
     setSelectedEvent(event)
     setFeedbackText("")
     setShowFeedbackModal(true)
+    console.log(`[v0] Requesting changes for event ${eventId}`)
   }
 
   const handleSubmitFeedback = async () => {
@@ -162,7 +166,7 @@ export function EventApprovals() {
       showToast("Success", "Feedback sent successfully!", "success")
       fetchPendingEvents()
     } catch (error) {
-      console.error("Error submitting feedback:", error)
+      console.error("[v0] Error submitting feedback:", error)
       showToast("Error", "Failed to send feedback. Please try again.", "error")
     }
   }
@@ -219,6 +223,7 @@ export function EventApprovals() {
 
                   <p className="text-sm text-gray-600 mb-4">{event.description}</p>
 
+                  {/* Event Image */}
                   {event.image_url && (
                     <div className="mb-4">
                       <img
@@ -295,6 +300,7 @@ export function EventApprovals() {
         </CardContent>
       </Card>
 
+      {/* Event Details Modal */}
       <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -371,6 +377,7 @@ export function EventApprovals() {
         </DialogContent>
       </Dialog>
 
+      {/* Feedback Modal */}
       <Dialog open={showFeedbackModal} onOpenChange={setShowFeedbackModal}>
         <DialogContent>
           <DialogHeader>

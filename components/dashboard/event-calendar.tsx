@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { CalendarIcon, Clock, MapPin, Users, Eye } from "lucide-react"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { formatTimeWithoutSeconds } from "@/lib/utils/time-format"
 import { useAuth } from "@/hooks/use-auth"
 
 interface EventCalendarProps {
@@ -25,12 +26,6 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
   const { user } = useAuth()
 
   useEffect(() => {
-    console.log('[CALENDAR] Component mounted/updated:', { 
-      userRole, 
-      showUserEventsOnly, 
-      userId: user?.id,
-      userExists: !!user 
-    })
     fetchEvents()
   }, [user, showUserEventsOnly])
 
@@ -38,135 +33,59 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
     try {
       const supabase = createClient()
 
-      if (showUserEventsOnly && user) {
-        if (userRole === "organizer") {
-          // Organizer: events they created
-          const { data, error } = await supabase
-            .from("events")
-            .select(`
-              id, title, description, category, event_date, start_time, end_time, 
-              current_participants, max_participants,
-              venues (venue_name, blocks (block_name)),
-              organizers (name)
-            `)
-            .eq("organizer_id", (
-              await supabase.from("organizers").select("id").eq("user_id", user.id).single()
-            ).data?.id || -1)
-            .order("event_date", { ascending: true })
-
-          if (error) throw error
-          setEvents(data || [])
-          setLoading(false)
-          return
-        }
-
-        // Student: events they are registered for
-        const { data: studentRow, error: studentError } = await supabase
-          .from("students")
+      if (showUserEventsOnly && user && userRole === "organizer") {
+        // Get organizer events
+        const { data: organizerData, error: organizerError } = await supabase
+          .from("organizers")
           .select("id")
           .eq("user_id", user.id)
           .single()
 
-        console.log('[CALENDAR] Student lookup:', { studentRow, studentError, userId: user.id })
-
-        if (!studentRow) {
-          console.log('[CALENDAR] No student profile found')
+        if (organizerError || !organizerData) {
           setEvents([])
           setLoading(false)
           return
         }
 
         const { data, error } = await supabase
-          .from("event_registrations")
+          .from("events")
           .select(`
-            events (
-              id, title, description, category_id, event_date, start_time, end_time,
-              current_participants, max_participants,
-              venues (venue_name, blocks (block_name)),
-              organizers (name, department),
-              event_categories (name, color_code)
-            )
+            id, title, description, event_date, start_time, end_time, 
+            current_participants, max_participants, status,
+            venues (venue_name, blocks (block_name)),
+            organizers (name),
+            event_categories (name, color_code)
           `)
-          .eq("student_id", studentRow.id)
-          .eq("status", "registered")
-          .order("registration_date", { ascending: false })
+          .eq("organizer_id", organizerData.id)
+          .order("event_date", { ascending: true })
 
-        if (error) {
-          console.log('[CALENDAR] Registration query error:', error)
-          throw error
-        }
-
-        console.log('[CALENDAR] Raw registration data:', data)
-
-        // Flatten to events and normalize data
-        const mapped = (data || [])
-          .map((r: any) => r.events)
-          .filter(Boolean)
-          .map((event: any) => ({
-            ...event,
-            category: Array.isArray(event.event_categories) 
-              ? event.event_categories[0]?.name 
-              : event.event_categories?.name || "Unknown",
-            venues: Array.isArray(event.venues) ? event.venues[0] : event.venues,
-            organizers: Array.isArray(event.organizers) ? event.organizers[0] : event.organizers
-          }))
-
-        setEvents(mapped)
+        if (error) throw error
+        setEvents(data || [])
         
-        // Set event dates for calendar highlighting
-        const dates = mapped.map((event: any) => {
-          const eventDate = new Date(event.event_date)
-          // Normalize to local date to avoid timezone issues
-          return new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate())
-        })
+        const dates = (data || []).map((event: any) => new Date(event.event_date))
         setEventDates(dates)
+      } else {
+        // Get public events
+        const { data, error } = await supabase
+          .from("events")
+          .select(`
+            id, title, description, event_date, start_time, end_time, 
+            current_participants, max_participants,
+            venues (venue_name, blocks (block_name)),
+            organizers (name),
+            event_categories (name, color_code)
+          `)
+          .eq("status", "approved")
+          .gte("event_date", new Date().toISOString().split("T")[0])
+          .order("event_date", { ascending: true })
+
+        if (error) throw error
+        setEvents(data || [])
         
-        // Debug logging
-        console.log('[CALENDAR] Student registered events:', mapped.length)
-        console.log('[CALENDAR] Event dates for highlighting:', dates)
-        console.log('[CALENDAR] Mapped events:', mapped)
-        
-        setLoading(false)
-        return
+        const dates = (data || []).map((event: any) => new Date(event.event_date))
+        setEventDates(dates)
       }
-
-      // Public/All approved upcoming events
-      const { data, error } = await supabase
-        .from("events")
-        .select(`
-          id, title, description, category_id, event_date, start_time, end_time, 
-          current_participants, max_participants,
-          venues (venue_name, blocks (block_name)),
-          organizers (name),
-          event_categories (name, color_code)
-        `)
-        .eq("status", "approved")
-        .gte("event_date", new Date().toISOString().split("T")[0])
-        .order("event_date", { ascending: true })
-
-      if (error) throw error
-      
-      // Normalize public events data
-      const normalizedEvents = (data || []).map((event: any) => ({
-        ...event,
-        category: Array.isArray(event.event_categories) 
-          ? event.event_categories[0]?.name 
-          : event.event_categories?.name || "Unknown",
-        venues: Array.isArray(event.venues) ? event.venues[0] : event.venues,
-        organizers: Array.isArray(event.organizers) ? event.organizers[0] : event.organizers
-      }))
-      
-      setEvents(normalizedEvents)
-      
-      // Set event dates for calendar highlighting
-      const dates = normalizedEvents.map((event: any) => {
-        const eventDate = new Date(event.event_date)
-        // Normalize to local date to avoid timezone issues
-        return new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate())
-      })
-      setEventDates(dates)
     } catch (error) {
-      // Handle error silently or show user-friendly message
       setEvents([])
       setEventDates([])
     } finally {
@@ -177,72 +96,10 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
   const getEventsForDate = (date: Date) => {
     return events.filter((event) => {
       const eventDate = new Date(event.event_date)
-      // Normalize both dates to avoid timezone issues
       const normalizedEventDate = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate())
       const normalizedSelectedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
       return normalizedEventDate.getTime() === normalizedSelectedDate.getTime()
     })
-  }
-
-  const getEventDates = () => {
-    return events.map((event) => new Date(event.event_date))
-  }
-
-  const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : []
-
-  const handleDateSelect = (date: Date | undefined) => {
-    console.log('[CALENDAR] Date selected:', date)
-    setSelectedDate(date)
-    if (date) {
-      const eventsOnDate = getEventsForDate(date)
-      console.log('[CALENDAR] Events found for selected date:', eventsOnDate.length, eventsOnDate)
-      if (eventsOnDate.length > 0) {
-        // Show first event details if there are events on this date
-        setSelectedEvent(eventsOnDate[0])
-        setShowEventModal(true)
-      }
-    }
-  }
-
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case "technical":
-        return "bg-[#799EFF] text-white"
-      case "cultural":
-        return "bg-[#FFDE63] text-gray-900"
-      case "sports":
-        return "bg-orange-100 text-orange-800"
-      case "academic":
-        return "bg-green-100 text-green-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  const handleViewEvent = (event: any) => {
-    setSelectedEvent(event)
-    setShowEventModal(true)
-  }
-
-  const handleAddToCalendar = (event: any) => {
-    const eventDate = new Date(event.event_date)
-    const title = encodeURIComponent(event.title)
-    const details = encodeURIComponent(event.description)
-    const location = encodeURIComponent(
-      (event.venues?.venue_name || event.venues?.name || event.venue?.venue_name || event.venue?.name || "") +
-      (event.venues?.blocks?.block_name ? ", " + event.venues.blocks.block_name : "")
-    )
-
-    const startDate = eventDate.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z"
-    const endDate = new Date(eventDate.getTime() + 2 * 60 * 60 * 1000)
-      .toISOString()
-      .replace(/[-:]/g, "")
-      .split(".")[0] + "Z"
-
-    const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDate}/${endDate}&details=${details}&location=${location}`
-
-    window.open(googleCalendarUrl, "_blank")
-    console.log(`[v0] Adding event ${event.id} to calendar`)
   }
 
   if (loading) {
@@ -251,11 +108,13 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CalendarIcon className="w-5 h-5 text-blue-600" />
-            Event Calendar
+            My Events
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p>Loading calendar...</p>
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
         </CardContent>
       </Card>
     )
@@ -263,28 +122,29 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Card className="w-full">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <CalendarIcon className="w-5 h-5 text-blue-600" />
-            Event Calendar
+            My Events
             {showUserEventsOnly && (
-              <Badge variant="outline" className="ml-2">
-                {userRole === "student" ? "My Events" : "My Organized Events"}
+              <Badge variant="outline" className="ml-2 text-xs">
+                {userRole === "student" ? "Registered" : "Organized"}
               </Badge>
             )}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div>
+        <CardContent className="p-4">
+          <div className="space-y-4">
+            {/* Compact Calendar */}
+            <div className="bg-gray-50 rounded-lg p-3">
               <Calendar
                 mode="single"
                 selected={selectedDate}
-                onSelect={handleDateSelect}
-                className="rounded-md border cursor-pointer"
+                onSelect={setSelectedDate}
+                className="rounded-md"
                 modifiers={{
-                  hasEvent: (date) => {
+                  hasEvent: (date: Date) => {
                     return eventDates.some(eventDate => {
                       const normalizedEventDate = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate())
                       const normalizedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
@@ -293,131 +153,150 @@ export function EventCalendar({ userRole = "student", showUserEventsOnly = false
                   },
                 }}
                 modifiersStyles={{
-                  hasEvent: {
-                    backgroundColor: "#3B82F6",
-                    color: "white",
-                    fontWeight: "bold",
-                    cursor: "pointer",
-                    borderRadius: "6px",
-                  },
+                  hasEvent: { 
+                    backgroundColor: '#3B82F6', 
+                    color: 'white', 
+                    fontWeight: 'bold',
+                    borderRadius: '6px'
+                  }
+                }}
+                classNames={{
+                  months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
+                  month: "space-y-4",
+                  caption: "flex justify-center pt-1 relative items-center text-sm font-medium mb-2",
+                  caption_label: "text-sm font-medium",
+                  nav: "space-x-1 flex items-center",
+                  nav_button: "h-8 w-8 bg-transparent p-0 opacity-50 hover:opacity-100 cursor-pointer rounded-md hover:bg-gray-200",
+                  nav_button_previous: "absolute left-1",
+                  nav_button_next: "absolute right-1",
+                  table: "w-full border-collapse space-y-2",
+                  head_row: "flex mb-2",
+                  head_cell: "text-muted-foreground rounded-md w-10 font-normal text-[0.8rem] text-center",
+                  row: "flex w-full mt-3 justify-between",
+                  cell: "text-center text-sm p-1 relative [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+                  day: "h-10 w-10 p-0 font-normal aria-selected:opacity-100 hover:bg-gray-200 rounded-md text-sm cursor-pointer flex items-center justify-center transition-colors",
+                  day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+                  day_today: "bg-accent text-accent-foreground font-semibold border-2 border-blue-300",
+                  day_outside: "text-muted-foreground opacity-50",
+                  day_disabled: "text-muted-foreground opacity-50",
+                  day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
+                  day_hidden: "invisible",
                 }}
               />
             </div>
-
-            <div>
-              <h3 className="font-semibold text-lg mb-4">
-                {selectedDate ? `Events on ${selectedDate.toLocaleDateString()}` : "Select a date"}
-              </h3>
-
-              {selectedDateEvents.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">
-                  {selectedDate ? "No events scheduled for this date" : "Select a date to view events"}
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {selectedDateEvents.map((event) => (
-                    <div key={event.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-gray-900">{event.title}</h4>
-                          <p className="text-sm text-gray-600">by {event.organizers?.name || event.organizer?.name}</p>
-                        </div>
-                        <Badge className={getCategoryColor(event.category)}>{event.category}</Badge>
-                      </div>
-
-                      <div className="space-y-1 text-sm text-gray-600 mb-3">
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-3 h-3" />
-                          <span>{event.start_time} - {event.end_time}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <MapPin className="w-3 h-3" />
-                          <span>
-                            {event.venues?.venue_name || event.venues?.name || event.venue?.venue_name || event.venue?.name}
-                            {event.venues?.blocks?.block_name ? `, ${event.venues.blocks.block_name}` : ""}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Users className="w-3 h-3" />
-                          <span>
-                            {event.current_participants}/{event.max_participants} registered
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 border-blue-600 text-white hover:text-white"
-                          onClick={() => handleViewEvent(event)}
-                        >
-                          <Eye className="w-3 h-3" />
-                          View Details
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white"
-                          onClick={() => handleAddToCalendar(event)}
-                        >
-                          <CalendarIcon className="w-3 h-3" />
-                          Add to Calendar
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+            
+            {/* Event List for Selected Date */}
+            {selectedDate && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium text-gray-900 text-sm">
+                    {selectedDate.toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  </h3>
+                  <Badge variant="outline" className="text-xs">
+                    {getEventsForDate(selectedDate).length} event{getEventsForDate(selectedDate).length !== 1 ? 's' : ''}
+                  </Badge>
                 </div>
-              )}
-            </div>
+                
+                {getEventsForDate(selectedDate).length > 0 ? (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {getEventsForDate(selectedDate).map((event) => (
+                      <div key={event.id} className="group p-3 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all cursor-pointer"
+                           onClick={() => {
+                             setSelectedEvent(event)
+                             setShowEventModal(true)
+                           }}>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-gray-900 text-sm truncate group-hover:text-blue-700">
+                              {event.title}
+                            </h4>
+                            <div className="flex items-center gap-3 mt-1">
+                              <div className="flex items-center gap-1 text-xs text-gray-500">
+                                <Clock className="w-3 h-3" />
+                                <span>{formatTimeWithoutSeconds(event.start_time)}</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-xs text-gray-500">
+                                <Users className="w-3 h-3" />
+                                <span>{event.current_participants}/{event.max_participants}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 mt-1 text-xs text-gray-500">
+                              <MapPin className="w-3 h-3" />
+                              <span className="truncate">
+                                {event.venues?.venue_name || 'TBA'}
+                                {event.venues?.blocks?.block_name && `, ${event.venues.blocks.block_name}`}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Eye className="w-4 h-4 text-blue-600" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-gray-500">
+                    <CalendarIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No events on this date</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
+      {/* Simplified Event Details Modal */}
       <Dialog open={showEventModal} onOpenChange={setShowEventModal}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Event Details</DialogTitle>
+            <DialogTitle className="text-lg">{selectedEvent?.title}</DialogTitle>
           </DialogHeader>
           {selectedEvent && (
             <div className="space-y-4">
-              <div>
-                <h3 className="font-semibold text-lg">{selectedEvent.title}</h3>
-                <p className="text-sm text-gray-600">by {selectedEvent.organizers?.name || selectedEvent.organizer?.name}</p>
-                <Badge className={getCategoryColor(selectedEvent.category)}>{selectedEvent.category}</Badge>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="font-medium">Date & Time</p>
-                  <p className="text-sm">{new Date(selectedEvent.event_date).toLocaleString()}</p>
+              <div className="grid grid-cols-1 gap-3 text-sm">
+                <div className="flex items-center gap-2">
+                  <CalendarIcon className="w-4 h-4 text-gray-500" />
+                  <span>{new Date(selectedEvent.event_date).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}</span>
                 </div>
-                <div>
-                  <p className="font-medium">Venue</p>
-                  <p className="text-sm">
-                    {selectedEvent.venues?.venue_name || selectedEvent.venues?.name || selectedEvent.venue?.venue_name || selectedEvent.venue?.name}
-                    {selectedEvent.venues?.blocks?.block_name ? `, ${selectedEvent.venues.blocks.block_name}` : ""}
-                  </p>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-gray-500" />
+                  <span>{formatTimeWithoutSeconds(selectedEvent.start_time)} - {formatTimeWithoutSeconds(selectedEvent.end_time)}</span>
                 </div>
-                <div>
-                  <p className="font-medium">Capacity</p>
-                  <p className="text-sm">
-                    {selectedEvent.current_participants}/{selectedEvent.max_participants}
-                  </p>
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-gray-500" />
+                  <span>{selectedEvent.venues?.venue_name || 'TBA'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-gray-500" />
+                  <span>{selectedEvent.current_participants}/{selectedEvent.max_participants} registered</span>
                 </div>
               </div>
-
-              <div>
-                <p className="font-medium">Description</p>
-                <p className="text-sm mt-1">{selectedEvent.description}</p>
-              </div>
-
-              <div className="flex gap-2 pt-4">
+              
+              {selectedEvent.description && (
+                <div className="pt-3 border-t">
+                  <p className="text-sm text-gray-600 leading-relaxed">{selectedEvent.description}</p>
+                </div>
+              )}
+              
+              <div className="flex gap-2 pt-2">
                 <Button 
-                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white" 
-                  onClick={() => handleAddToCalendar(selectedEvent)}
+                  size="sm" 
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
+                  onClick={() => window.open(`/dashboard/organizer/events/${selectedEvent.id}`, '_blank')}
                 >
-                  <CalendarIcon className="w-4 h-4" />
-                  Add to Calendar
+                  <Eye className="w-4 h-4 mr-1" />
+                  View Details
                 </Button>
               </div>
             </div>

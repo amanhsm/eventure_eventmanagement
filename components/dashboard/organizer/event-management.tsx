@@ -8,6 +8,9 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
+import { useCustomToast } from "@/hooks/use-toast-custom"
+import { formatTimeRange } from "@/lib/utils/time-format"
+import { DeleteConfirmationModal } from "@/components/ui/delete-confirmation-modal"
 import EventCreationForm from "./event-creation-form"
 
 interface Event {
@@ -22,6 +25,8 @@ interface Event {
   registration_fee: number
   status: string
   approval_status: string
+  admin_feedback: string | null
+  image_url?: string
   event_categories: {
     name: string
   } | null
@@ -36,6 +41,7 @@ interface Event {
 export function EventManagement() {
   const { user } = useAuth()
   const router = useRouter()
+  const { showToast, ToastContainer } = useCustomToast()
   const [events, setEvents] = useState<Event[]>([])
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -43,6 +49,11 @@ export function EventManagement() {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [organizerId, setOrganizerId] = useState<number | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; event: Event | null }>({
+    isOpen: false,
+    event: null
+  })
+  const [isDeleting, setIsDeleting] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -57,19 +68,21 @@ export function EventManagement() {
           .eq('user_id', user.id)
           .single()
 
-        if (organizerError) {
-          console.error('Error fetching organizer:', organizerError)
-          setError('Failed to load organizer profile')
+        if (organizerError || !organizerData) {
+          console.log('No organizer profile found')
+          setIsLoading(false)
           return
         }
 
-        if (organizerData) {
-          setOrganizerId(organizerData.id)
-          await fetchOrganizerEvents(organizerData.id)
-        }
+        const targetOrganizerId = organizerData.id
+        setOrganizerId(targetOrganizerId)
+
+        // Then fetch events for this organizer
+        await fetchOrganizerEvents(targetOrganizerId)
       } catch (error) {
-        console.error('Error in fetchOrganizerIdAndEvents:', error)
-        setError('Failed to load data')
+        console.error('Error fetching organizer ID:', error)
+        setError('Failed to load organizer profile')
+        setIsLoading(false)
       }
     }
 
@@ -103,7 +116,7 @@ export function EventManagement() {
           venues(venue_name, blocks(block_name))
         `)
         .eq('organizer_id', targetOrganizerId)
-        .order('event_date', { ascending: true })
+        .order('created_at', { ascending: false })
 
       if (error) throw error
 
@@ -117,6 +130,7 @@ export function EventManagement() {
       setIsLoading(false)
     }
   }
+
 
   // Filter events based on status
   useEffect(() => {
@@ -135,6 +149,7 @@ export function EventManagement() {
       approved: events.filter(e => e.status === 'approved').length,
       completed: events.filter(e => e.status === 'completed').length,
       rejected: events.filter(e => e.status === 'rejected').length,
+      changes_requested: events.filter(e => e.status === 'changes_requested').length,
     }
   }
 
@@ -148,16 +163,14 @@ export function EventManagement() {
         return "bg-green-100 text-green-800"
       case "pending_approval":
         return "bg-yellow-100 text-yellow-800"
-      case "pending":
-        return "bg-yellow-100 text-yellow-800"
-      case "draft":
-        return "bg-gray-100 text-gray-600"
       case "rejected":
         return "bg-red-100 text-red-800"
+      case "changes_requested":
+        return "bg-orange-100 text-orange-800"
+      case "draft":
+        return "bg-gray-100 text-gray-800"
       case "completed":
         return "bg-blue-100 text-blue-800"
-      case "cancelled":
-        return "bg-red-100 text-red-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
@@ -175,6 +188,8 @@ export function EventManagement() {
         return "Completed"
       case "rejected":
         return "Rejected"
+      case "changes_requested":
+        return "Changes Requested"
       case "cancelled":
         return "Cancelled"
       default:
@@ -200,29 +215,73 @@ export function EventManagement() {
   }
 
   const handleViewEvent = (eventId: number) => {
-    console.log(`[v0] Viewing event ${eventId}`)
-    // Navigate to event details page
+    router.push(`/dashboard/organizer/events/${eventId}`)
   }
 
   const handleEditEvent = (eventId: number) => {
-    console.log(`[v0] Editing event ${eventId}`)
-    router.push(`/dashboard/organizer/edit-event/${eventId}`)
+    router.push(`/dashboard/organizer/events/${eventId}/edit`)
   }
 
-  const handleDeleteEvent = (eventId: number) => {
-    if (confirm("Are you sure you want to delete this event?")) {
-      setEvents(events.filter((event) => event.id !== eventId))
-      console.log(`[v0] Deleted event ${eventId}`)
+  const handleViewChangeRequest = (eventId: number) => {
+    router.push(`/dashboard/organizer/events/${eventId}/change-request`)
+  }
+
+  const handleDeleteEvent = (event: Event) => {
+    setDeleteModal({ isOpen: true, event })
+  }
+
+  const confirmDeleteEvent = async () => {
+    if (!deleteModal.event) return
+
+    setIsDeleting(true)
+    try {
+      const { error } = await supabase
+        .from('events')
+        .delete()
+        .eq('id', deleteModal.event.id)
+
+      if (error) throw error
+
+      // Update local state
+      setEvents(events.filter((event) => event.id !== deleteModal.event!.id))
+      showToast('Success!', 'Event deleted successfully', 'success')
+      setDeleteModal({ isOpen: false, event: null })
+    } catch (error) {
+      console.error('Error deleting event:', error)
+      showToast('Error', 'Failed to delete event', 'error')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
-  const handleSubmitForApproval = (eventId: number) => {
-    setEvents(events.map((event) => 
-      event.id === eventId 
-        ? { ...event, status: "pending_approval" }
-        : event
-    ))
-    console.log(`[v0] Submitted event ${eventId} for approval`)
+  const closeDeleteModal = () => {
+    setDeleteModal({ isOpen: false, event: null })
+  }
+  const handleSubmitForApproval = async (eventId: number) => {
+    try {
+      const { error } = await supabase
+        .from('events')
+        .update({ 
+          status: 'pending_approval',
+          approval_status: 'pending',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', eventId)
+
+      if (error) throw error
+
+      // Update local state
+      setEvents(events.map((event) => 
+        event.id === eventId 
+          ? { ...event, status: "pending_approval", approval_status: "pending" }
+          : event
+      ))
+      
+      showToast('Success!', 'Event submitted for approval', 'success')
+    } catch (error) {
+      console.error('Error submitting event:', error)
+      showToast('Error', 'Failed to submit event for approval', 'error')
+    }
   }
 
   if (isLoading) {
@@ -281,11 +340,13 @@ export function EventManagement() {
   }
 
   return (
-    <Card>
+    <>
+      <ToastContainer />
+      <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-xl">Event Management</CardTitle>
-          <Button size="sm" className="bg-[#799EFF] hover:bg-[#6B8EFF] cursor-pointer" onClick={handleCreateEvent}>
+          <Button size="sm" className="bg-[#799EFF] hover:bg-[#6B8EFF] text-white cursor-pointer" onClick={handleCreateEvent}>
             <Plus className="w-4 h-4 mr-2" />
             Create New Event
           </Button>
@@ -300,6 +361,7 @@ export function EventManagement() {
             { key: 'pending_approval', label: 'Pending', count: getEventCounts().pending_approval },
             { key: 'approved', label: 'Active', count: getEventCounts().approved },
             { key: 'completed', label: 'Completed', count: getEventCounts().completed },
+            { key: 'changes_requested', label: 'Changes Requested', count: getEventCounts().changes_requested },
             { key: 'rejected', label: 'Rejected', count: getEventCounts().rejected },
           ].map((tab) => (
             <button
@@ -356,6 +418,17 @@ export function EventManagement() {
                     </div>
                   </div>
 
+                  {/* Event Image */}
+                  {event.image_url && (
+                    <div className="mb-4">
+                      <img
+                        src={event.image_url}
+                        alt={event.title}
+                        className="w-full max-w-sm h-32 object-cover rounded-lg border border-gray-200"
+                      />
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Calendar className="w-4 h-4 text-blue-600" />
@@ -389,26 +462,43 @@ export function EventManagement() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="flex items-center gap-1 bg-transparent"
+                      className="flex items-center gap-1 bg-white hover:bg-gray-50 border-gray-300 cursor-pointer"
                       onClick={() => handleViewEvent(event.id)}
                     >
                       <Eye className="w-3 h-3" />
                       View
                     </Button>
+                    
+                    {/* Show View Change Request button for changes_requested status */}
+                    {event.status === 'changes_requested' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex items-center gap-1 bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 cursor-pointer"
+                        onClick={() => handleViewChangeRequest(event.id)}
+                      >
+                        <Eye className="w-3 h-3" />
+                        View Change Request
+                      </Button>
+                    )}
+                    
+                    {/* Show Edit button for changes_requested and draft status */}
+                    {(event.status === 'changes_requested' || event.status === 'draft') && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex items-center gap-1 bg-white hover:bg-gray-50 border-gray-300 cursor-pointer"
+                        onClick={() => handleEditEvent(event.id)}
+                      >
+                        <Edit className="w-3 h-3" />
+                        Edit
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"
-                      className="flex items-center gap-1 bg-transparent"
-                      onClick={() => handleEditEvent(event.id)}
-                    >
-                      <Edit className="w-3 h-3" />
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex items-center gap-1 text-red-600 hover:text-red-700 bg-transparent"
-                      onClick={() => handleDeleteEvent(event.id)}
+                      className="flex items-center gap-1 text-red-600 hover:text-red-700 bg-white hover:bg-red-50 border-red-300 cursor-pointer"
+                      onClick={() => handleDeleteEvent(event)}
                     >
                       <Trash2 className="w-3 h-3" />
                       Delete
@@ -416,7 +506,7 @@ export function EventManagement() {
                     {event.status === "draft" && (
                       <Button
                         size="sm"
-                        className="bg-blue-600 hover:bg-blue-700"
+                        className="bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
                         onClick={() => handleSubmitForApproval(event.id)}
                       >
                         Submit for Approval
@@ -430,5 +520,16 @@ export function EventManagement() {
         )}
       </CardContent>
     </Card>
+    
+    <DeleteConfirmationModal
+      isOpen={deleteModal.isOpen}
+      onClose={closeDeleteModal}
+      onConfirm={confirmDeleteEvent}
+      title="Delete Event"
+      description="Are you sure you want to delete this event? This will permanently remove the event and all associated data."
+      itemName={deleteModal.event?.title || ""}
+      isLoading={isDeleting}
+    />
+    </>
   )
 }

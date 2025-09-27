@@ -2,10 +2,11 @@
 
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { createClient } from "@/lib/supabase/client"
+import { formatTimeWithoutSeconds } from "@/lib/utils/time-format"
 import { Calendar, ArrowRight } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
 
 interface UpcomingEvent {
   id: number
@@ -157,7 +158,7 @@ export function HeroSection() {
                             {event.title}
                           </h4>
                           <p className="text-sm text-blue-200">
-                            {event.start_time} • {event.venue_name}{event.block_name ? `, ${event.block_name}` : ''}
+                            {formatTimeWithoutSeconds(event.start_time)} • {event.venue_name}{event.block_name ? `, ${event.block_name}` : ''}
                           </p>
                         </div>
                       </div>

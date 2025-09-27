@@ -7,11 +7,13 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { ImageUpload } from "@/components/ui/image-upload"
 import { Calendar, MapPin, Users, Clock, CheckCircle, AlertCircle } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
+import { notificationService } from "@/lib/services/notification-service"
 
 interface Venue {
   id: string
@@ -54,6 +56,7 @@ export function CreateEventForm() {
     contactPhone: "",
     organization: "",
     additionalNotes: "",
+    imageUrl: "",
   })
 
   useEffect(() => {
@@ -142,6 +145,7 @@ export function CreateEventForm() {
         max_participants: formData.maxRegistrations ? Number.parseInt(formData.maxRegistrations) : null,
         registration_fee: formData.hasRegistrationFee && formData.registrationFee ? Number.parseFloat(formData.registrationFee) : 0,
         requirements: formData.requirements,
+        image_url: formData.imageUrl || null,
         status: "draft",
       }
 
@@ -177,6 +181,7 @@ export function CreateEventForm() {
         max_participants: formData.maxRegistrations ? Number.parseInt(formData.maxRegistrations) : null,
         registration_fee: formData.hasRegistrationFee && formData.registrationFee ? Number.parseFloat(formData.registrationFee) : 0,
         requirements: formData.requirements,
+        image_url: formData.imageUrl || null,
         status: "pending_approval",
         approval_status: "pending",
       }
@@ -210,6 +215,19 @@ export function CreateEventForm() {
         const { error: bookingError } = await supabase.from("venue_bookings").insert([bookingData])
 
         if (bookingError) throw bookingError
+      }
+
+      // Notify admins about new event submission
+      try {
+        const organizerName = profile?.name || user.usernumber || 'Unknown Organizer'
+        await notificationService.notifyAdminNewEventSubmission(
+          eventResult.id,
+          formData.title,
+          organizerName
+        )
+      } catch (notificationError) {
+        console.error('Error sending admin notification:', notificationError)
+        // Don't fail the whole process if notification fails
       }
 
       console.log("[v0] Event submitted for approval with venue booking")
@@ -267,6 +285,20 @@ export function CreateEventForm() {
               value={formData.description}
               onChange={(e) => handleInputChange("description", e.target.value)}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Event Image</Label>
+            <ImageUpload
+              onImageUpload={(imageUrl) => handleInputChange("imageUrl", imageUrl)}
+              onImageRemove={() => handleInputChange("imageUrl", "")}
+              currentImage={formData.imageUrl}
+              eventId={formData.title ? formData.title.replace(/\s+/g, '-').toLowerCase() : undefined}
+              disabled={isSubmitting}
+            />
+            <p className="text-sm text-gray-500">
+              Upload an image to make your event more attractive. Supported formats: JPG, PNG, WebP (max 5MB)
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

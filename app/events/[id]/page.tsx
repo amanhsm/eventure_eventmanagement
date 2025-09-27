@@ -23,6 +23,8 @@ interface EventDetail {
   registration_deadline: string
   registration_fee: number
   status: string
+  image_url?: string
+  requirements?: string
   venues: {
     venue_name: string
     blocks?: { block_name: string } | null
@@ -72,6 +74,8 @@ export default function EventDetailPage() {
             registration_deadline,
             registration_fee,
             status,
+            image_url,
+            requirements,
             venues (
               venue_name,
               blocks ( block_name ),
@@ -298,6 +302,17 @@ export default function EventDetailPage() {
             <CardContent>
               <p className="text-gray-600 mb-6 leading-relaxed">{event.description}</p>
 
+              {/* Event Image */}
+              {event.image_url && (
+                <div className="mb-6">
+                  <img
+                    src={event.image_url}
+                    alt={event.title}
+                    className="w-full max-w-2xl h-64 object-cover rounded-lg border border-gray-200 shadow-sm"
+                  />
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div className="flex items-center gap-3">
                   <Calendar className="w-5 h-5 text-blue-600" />
@@ -359,6 +374,68 @@ export default function EventDetailPage() {
                 </div>
               </div>
 
+              {/* Additional Event Information */}
+              <div className="mt-8 space-y-6">
+                {/* Requirements Section */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                    Requirements & Eligibility
+                  </h3>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <p className="text-gray-700">
+                      {event.requirements || "No special requirements. Open to all eligible students."}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Contact Information */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                    Contact Information
+                  </h3>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-600">Organizer</p>
+                        <p className="font-medium">{event.organizers?.name}</p>
+                        <p className="text-sm text-gray-600">{event.organizers?.department}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">For inquiries</p>
+                        <p className="text-sm text-gray-700">Contact the organizer through the event management system</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Event Stats */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                    <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
+                    Event Statistics
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-blue-50 rounded-lg p-3 text-center">
+                      <p className="text-2xl font-bold text-blue-600">{event.current_participants}</p>
+                      <p className="text-sm text-blue-600">Registered</p>
+                    </div>
+                    <div className="bg-green-50 rounded-lg p-3 text-center">
+                      <p className="text-2xl font-bold text-green-600">{event.max_participants - event.current_participants}</p>
+                      <p className="text-sm text-green-600">Available</p>
+                    </div>
+                    <div className="bg-orange-50 rounded-lg p-3 text-center">
+                      <p className="text-2xl font-bold text-orange-600">₹{event.registration_fee}</p>
+                      <p className="text-sm text-orange-600">Fee</p>
+                    </div>
+                    <div className="bg-purple-50 rounded-lg p-3 text-center">
+                      <p className="text-2xl font-bold text-purple-600">{Math.round((event.current_participants / event.max_participants) * 100)}%</p>
+                      <p className="text-sm text-purple-600">Filled</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
               
             </CardContent>
           </Card>

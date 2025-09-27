@@ -19,6 +19,7 @@ interface Event {
   deadline: string
   category: string
   status?: string
+  image_url?: string
 }
 
 interface EventCardProps {
@@ -63,7 +64,7 @@ export function EventCard({ event }: EventCardProps) {
       {/* Image Section */}
       <div className="relative h-48 w-full">
         <Image
-          src={getCategoryImage(event.category)}
+          src={event.image_url || getCategoryImage(event.category)}
           alt={event.title}
           fill
           className="object-cover"

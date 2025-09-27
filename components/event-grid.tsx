@@ -21,6 +21,7 @@ interface Event {
   status: string
   venue_id: number
   organizer_id: number
+  image_url?: string
   venues: {
     venue_name: string
     blocks?: {
@@ -89,6 +90,7 @@ export default function EventGrid({
             status,
             venue_id,
             organizer_id,
+            image_url,
             venues (
               venue_name,
               blocks (
@@ -246,6 +248,7 @@ export default function EventGrid({
       year: "numeric",
     }),
     registrationFee: event.registration_fee || 0,
+    image_url: event.image_url,
   })
 
   if (isLoading) {

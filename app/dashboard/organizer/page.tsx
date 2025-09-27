@@ -4,7 +4,7 @@ import { Navigation } from "@/components/navigation"
 import { OrganizerHeader } from "@/components/dashboard/organizer/organizer-header"
 import { OrganizerStats } from "@/components/dashboard/organizer/organizer-stats"
 import { EventManagement } from "@/components/dashboard/organizer/event-management"
-import { EventAnalytics } from "@/components/dashboard/organizer/event-analytics"
+import { EventCalendar } from "@/components/dashboard/event-calendar"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 
 export default function OrganizerDashboard() {
@@ -20,7 +20,7 @@ export default function OrganizerDashboard() {
               <EventManagement />
             </div>
             <div className="space-y-8">
-              <EventAnalytics />
+              <EventCalendar userRole="organizer" showUserEventsOnly={true} />
             </div>
           </div>
         </main>

@@ -130,7 +130,6 @@ export function OrganizerStats() {
       label: "Active Events",
       color: "text-blue-600",
       bgColor: "bg-blue-100",
-      change: "+3 this month",
     },
     {
       icon: Users,
@@ -138,7 +137,6 @@ export function OrganizerStats() {
       label: "Total Registrations",
       color: "text-green-600",
       bgColor: "bg-green-100",
-      change: "+156 this week",
     },
     {
       icon: MapPin,
@@ -146,7 +144,6 @@ export function OrganizerStats() {
       label: "Venues Booked",
       color: "text-purple-600",
       bgColor: "bg-purple-100",
-      change: "2 pending approval",
     },
   ]
 
@@ -155,7 +152,7 @@ export function OrganizerStats() {
       {statsData.map((stat, index) => (
         <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer">
           <CardContent className="p-6">
-            <div className="flex items-center gap-4 mb-2">
+            <div className="flex items-center gap-4">
               <div className={`w-12 h-12 rounded-lg ${stat.bgColor} flex items-center justify-center`}>
                 <stat.icon className={`w-6 h-6 ${stat.color}`} />
               </div>
@@ -164,7 +161,6 @@ export function OrganizerStats() {
                 <p className="text-sm text-gray-600">{stat.label}</p>
               </div>
             </div>
-            <p className="text-xs text-gray-500">{stat.change}</p>
           </CardContent>
         </Card>
       ))}
