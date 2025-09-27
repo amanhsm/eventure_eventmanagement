@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react"
 import { EventCard } from "@/components/event-card"
 import { createClient } from "@/lib/supabase/client"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 
 interface Event {
   id: number
@@ -57,6 +59,8 @@ export default function EventGrid({
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const eventsPerPage = 9
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -219,6 +223,7 @@ export default function EventGrid({
     }
 
     setFilteredEvents(sorted)
+    setCurrentPage(1) // Reset to first page when filters change
   }, [events, categoryFilter, searchQuery, quickFilter, sortBy])
 
   const transformEventForCard = (event: Event) => ({
@@ -252,8 +257,8 @@ export default function EventGrid({
           <div className="h-6 bg-gray-200 rounded w-32 animate-pulse"></div>
           <div className="h-10 bg-gray-200 rounded w-40 animate-pulse"></div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {[1, 2, 3, 4].map((i) => (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
             <div key={i} className="h-80 bg-gray-200 rounded-lg animate-pulse"></div>
           ))}
         </div>
@@ -279,10 +284,27 @@ export default function EventGrid({
   }
 
 
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredEvents.length / eventsPerPage)
+  const startIndex = (currentPage - 1) * eventsPerPage
+  const endIndex = startIndex + eventsPerPage
+  const currentEvents = filteredEvents.slice(startIndex, endIndex)
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    // Scroll to top of the grid
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <p className="text-gray-600">{filteredEvents.length} events found</p>
+        <p className="text-muted-foreground">
+          {filteredEvents.length} events found
+          {totalPages > 1 && (
+            <span className="ml-2">• Page {currentPage} of {totalPages}</span>
+          )}
+        </p>
         <div className="flex gap-4">
           <Select value={sortBy} onValueChange={onSortByChange}>
             <SelectTrigger className="w-40">
@@ -299,15 +321,58 @@ export default function EventGrid({
 
       {filteredEvents.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-500 text-lg mb-4">No events found matching your criteria</p>
-          <p className="text-gray-400">Try adjusting your filters or check back later for new events</p>
+          <p className="text-muted-foreground text-lg mb-4">No events found matching your criteria</p>
+          <p className="text-muted-foreground/80">Try adjusting your filters or check back later for new events</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredEvents.map((event) => (
-            <EventCard key={event.id} event={transformEventForCard(event)} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {currentEvents.map((event) => (
+              <EventCard key={event.id} event={transformEventForCard(event)} />
+            ))}
+          </div>
+          
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-8">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Previous
+              </Button>
+              
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handlePageChange(page)}
+                    className="cursor-pointer min-w-[40px]"
+                  >
+                    {page}
+                  </Button>
+                ))}
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="cursor-pointer"
+              >
+                Next
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

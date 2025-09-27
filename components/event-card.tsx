@@ -62,7 +62,7 @@ export function EventCard({ event }: EventCardProps) {
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] cursor-pointer">
       {/* Image Section */}
-      <div className="relative h-48 w-full">
+      <div className="relative h-40 w-full">
         <Image
           src={event.image_url || getCategoryImage(event.category)}
           alt={event.title}
@@ -76,49 +76,50 @@ export function EventCard({ event }: EventCardProps) {
         </div>
         {event.status && (
           <div className="absolute top-4 right-4">
-            <Badge className="bg-green-100 text-green-800">
+            <Badge className="bg-primary/10 text-primary">
               {event.status}
             </Badge>
           </div>
         )}
       </div>
 
-      <CardContent className="p-6">
-        <h3 className="font-bold text-xl mb-2 text-gray-900">{event.title}</h3>
-        <p className="text-gray-600 text-sm mb-2">by {event.organizer}</p>
-        <p className="text-gray-600 text-sm mb-4 line-clamp-3">{event.description}</p>
+      <CardContent className="p-4">
+        <h3 className="font-bold text-lg mb-2 text-foreground">{event.title}</h3>
+        <p className="text-muted-foreground text-xs mb-2">by {event.organizer}</p>
+        <p className="text-muted-foreground text-xs mb-3 line-clamp-2">{event.description}</p>
 
-        <div className="space-y-3 mb-4">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Calendar className="w-4 h-4 text-blue-600" />
+        <div className="space-y-2 mb-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Calendar className="w-3 h-3 text-primary" />
             <span>{event.date}</span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <MapPin className="w-4 h-4 text-blue-600" />
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <MapPin className="w-3 h-3 text-primary" />
             <span>{event.location}</span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Users className="w-4 h-4 text-blue-600" />
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Users className="w-3 h-3 text-primary" />
             <span>{event.registered} / {event.capacity} registered</span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Clock className="w-4 h-4 text-blue-600" />
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Clock className="w-3 h-3 text-primary" />
             <span>Deadline: {event.deadline}</span>
           </div>
         </div>
 
-        <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+        <div className="w-full bg-muted rounded-full h-1.5 mb-3">
           <div 
-            className="bg-blue-600 h-2 rounded-full transition-all" 
+            className="bg-primary h-1.5 rounded-full transition-all" 
             style={{ width: `${(event.registered / event.capacity) * 100}%` }}
           />
         </div>
 
         <Button 
           onClick={handleViewDetails}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
+          size="sm"
+          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
         >
-          <Eye className="w-4 h-4 mr-2" />
+          <Eye className="w-3 h-3 mr-1" />
           View Details
         </Button>
       </CardContent>

@@ -173,26 +173,26 @@ export default function StudentProfile() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-gray-600">Full Name</label>
+              <label className="text-sm font-medium text-muted-foreground">Full Name</label>
               <div className="flex items-center gap-2 mt-1">
-                <User className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-900">{profile.name}</span>
+                <User className="w-4 h-4 text-muted-foreground" />
+                <span className="text-foreground">{profile.name}</span>
               </div>
             </div>
 
             <div>
-              <label className="text-sm font-medium text-gray-600">Registration Number</label>
+              <label className="text-sm font-medium text-muted-foreground">Registration Number</label>
               <div className="flex items-center gap-2 mt-1">
-                <Hash className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-900">{profile.user?.usernumber || 'N/A'}</span>
+                <Hash className="w-4 h-4 text-muted-foreground" />
+                <span className="text-foreground">{profile.user?.usernumber || 'N/A'}</span>
               </div>
             </div>
 
             <div>
-              <label className="text-sm font-medium text-gray-600">Email</label>
+              <label className="text-sm font-medium text-muted-foreground">Email</label>
               <div className="flex items-center gap-2 mt-1">
-                <Mail className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-900">{profile.user?.email || 'N/A'}</span>
+                <Mail className="w-4 h-4 text-muted-foreground" />
+                <span className="text-foreground">{profile.user?.email || 'N/A'}</span>
               </div>
             </div>
 
@@ -249,13 +249,13 @@ export default function StudentProfile() {
           <div className="flex gap-3">
             <Button 
               variant="outline" 
-              className="cursor-pointer bg-white hover:bg-gray-50 border-gray-300 text-gray-700 hover:text-gray-900"
+              className="cursor-pointer"
               onClick={() => window.location.reload()}
             >
               Refresh Profile
             </Button>
             <Button 
-              className="bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
               onClick={handleEditProfile}
             >
               <Edit className="w-4 h-4 mr-2" />

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Calendar, MapPin, Users, Clock, DollarSign, User, ArrowLeft } from "lucide-react"
 import { format } from "date-fns"
+import { formatTimeWithoutSeconds } from "@/lib/utils/time-format"
 import { useAuth } from "@/hooks/use-auth"
 import { createClient } from "@/lib/supabase/client"
 
@@ -315,25 +316,25 @@ export default function EventDetailPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div className="flex items-center gap-3">
-                  <Calendar className="w-5 h-5 text-blue-600" />
+                  <Calendar className="w-5 h-5 text-primary" />
                   <div>
                     <p className="font-medium">Date</p>
-                    <p className="text-gray-600">{format(new Date(event.event_date), "MMMM d, yyyy")}</p>
+                    <p className="text-muted-foreground">{format(new Date(event.event_date), "MMMM d, yyyy")}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <Clock className="w-5 h-5 text-green-600" />
+                  <Clock className="w-5 h-5 text-primary" />
                   <div>
                     <p className="font-medium">Time</p>
-                    <p className="text-gray-600">
-                      {event.start_time} - {event.end_time}
+                    <p className="text-muted-foreground">
+                      {formatTimeWithoutSeconds(event.start_time)} - {formatTimeWithoutSeconds(event.end_time)}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <MapPin className="w-5 h-5 text-red-600" />
+                  <MapPin className="w-5 h-5 text-primary" />
                   <div>
                     <p className="font-medium">Venue</p>
                     <p className="text-gray-600">
@@ -344,7 +345,7 @@ export default function EventDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <User className="w-5 h-5 text-purple-600" />
+                  <User className="w-5 h-5 text-primary" />
                   <div>
                     <p className="font-medium">Organizer</p>
                     <p className="text-gray-600">
@@ -490,7 +491,7 @@ export default function EventDetailPage() {
                       <Button 
                         onClick={handleRegister}
                         disabled={isRegistering || isRegistered || isCancelled || isEventFull}
-                        className="w-full bg-[#799EFF] hover:bg-[#6B8EFF] text-white cursor-pointer"
+                        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer rounded-lg py-3 h-auto font-semibold text-base"
                       >
                         {isRegistering ? "Registering..." : isRegistered ? "Already Registered" : isCancelled ? "Registration Cancelled" : isEventFull ? "Event Full" : `Register ${event.registration_fee > 0 ? `(₹${event.registration_fee})` : "(Free)"}`}
                       </Button>

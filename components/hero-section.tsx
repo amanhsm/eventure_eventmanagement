@@ -101,14 +101,14 @@ export function HeroSection() {
   }, [])
 
   return (
-    <section className="bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white py-16">
+    <section className="bg-gradient-to-br from-primary via-primary/90 to-primary/80 text-primary-foreground py-16">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between">
           <div className="flex-1 max-w-2xl opacity-100">
             <h1 className="text-5xl font-bold mb-4 text-balance">
-              Discover Amazing <span className="text-yellow-400">Campus Events</span>
+              Discover Amazing <span className="text-accent">Campus Events</span>
             </h1>
-            <p className="text-xl mb-8 text-blue-100 leading-relaxed">
+            <p className="text-xl mb-8 text-primary-foreground/80 leading-relaxed">
               Join exciting events, workshops, and activities happening across Christ University. Connect with your
               community and make lasting memories.
             </p>
@@ -117,7 +117,7 @@ export function HeroSection() {
               <Link href="/browse">
                 <Button
                   size="lg"
-                  className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold transition-all duration-300 hover:scale-105 cursor-pointer group"
+                  className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold transition-all duration-300 hover:scale-105 cursor-pointer group"
                 >
                   Browse Events
                   <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
@@ -127,18 +127,18 @@ export function HeroSection() {
           </div>
 
           <div className="w-96 ml-8">
-            <Card className="bg-white/10 backdrop-blur-sm border-white/20 p-6 hover:bg-white/15 transition-all duration-300">
-              <h3 className="text-xl font-semibold mb-4 text-blue-200">Upcoming Events</h3>
+            <Card className="bg-primary-foreground/10 backdrop-blur-sm border-primary-foreground/20 p-6 hover:bg-primary-foreground/15 transition-all duration-300">
+              <h3 className="text-xl font-semibold mb-4 text-primary-foreground/80">Upcoming Events</h3>
               <div className="space-y-4">
                 {isLoading ? (
                   // Loading skeleton
                   <div className="space-y-4">
                     {[1, 2, 3].map((i) => (
                       <div key={i} className="flex items-center gap-3 p-2">
-                        <div className="w-10 h-10 bg-white/20 rounded-lg animate-pulse"></div>
+                        <div className="w-10 h-10 bg-primary-foreground/20 rounded-lg animate-pulse"></div>
                         <div className="flex-1">
-                          <div className="h-4 bg-white/20 rounded mb-2 animate-pulse"></div>
-                          <div className="h-3 bg-white/20 rounded w-2/3 animate-pulse"></div>
+                          <div className="h-4 bg-primary-foreground/20 rounded mb-2 animate-pulse"></div>
+                          <div className="h-3 bg-primary-foreground/20 rounded w-2/3 animate-pulse"></div>
                         </div>
                       </div>
                     ))}
@@ -146,7 +146,7 @@ export function HeroSection() {
                 ) : upcomingEvents.length > 0 ? (
                   upcomingEvents.map((event) => (
                     <Link key={event.id} href={`/events/${event.id}`}>
-                      <div className="flex items-center gap-3 hover:bg-white/10 p-2 rounded-lg transition-all duration-200 cursor-pointer group">
+                      <div className="flex items-center gap-3 hover:bg-primary-foreground/10 p-2 rounded-lg transition-all duration-200 cursor-pointer group">
                         <div
                           className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold text-sm group-hover:scale-110 transition-transform"
                           style={{ backgroundColor: event.category_color }}
@@ -154,10 +154,10 @@ export function HeroSection() {
                           {event.initials}
                         </div>
                         <div className="flex-1">
-                          <h4 className="font-medium text-white group-hover:text-yellow-300 transition-colors">
+                          <h4 className="font-medium text-primary-foreground group-hover:text-accent transition-colors">
                             {event.title}
                           </h4>
-                          <p className="text-sm text-blue-200">
+                          <p className="text-sm text-primary-foreground/80">
                             {formatTimeWithoutSeconds(event.start_time)} • {event.venue_name}{event.block_name ? `, ${event.block_name}` : ''}
                           </p>
                         </div>
@@ -166,14 +166,14 @@ export function HeroSection() {
                   ))
                 ) : (
                   <div className="text-center py-4">
-                    <p className="text-blue-200 text-sm">No upcoming events found</p>
+                    <p className="text-primary-foreground/80 text-sm">No upcoming events found</p>
                   </div>
                 )}
               </div>
               <Link href="/browse">
                 <Button
                   variant="ghost"
-                  className="w-full mt-4 text-blue-200 hover:bg-white/10 hover:text-white transition-all duration-200 cursor-pointer"
+                  className="w-full mt-4 text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground transition-all duration-200 cursor-pointer"
                 >
                   View All Events
                 </Button>

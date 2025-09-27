@@ -117,15 +117,15 @@ export function OrganizerStats() {
       icon: Calendar,
       value: isLoading ? "..." : stats.activeEvents.toString(),
       label: "Active Events",
-      color: "text-blue-600",
-      bgColor: "bg-blue-100",
+      color: "text-primary",
+      bgColor: "bg-primary/10",
     },
     {
       icon: Users,
       value: isLoading ? "..." : stats.totalRegistrations.toLocaleString(),
       label: "Total Registrations",
-      color: "text-green-600",
-      bgColor: "bg-green-100",
+      color: "text-accent-foreground",
+      bgColor: "bg-accent/20",
     },
   ]
 
@@ -139,8 +139,8 @@ export function OrganizerStats() {
                 <stat.icon className={`w-6 h-6 ${stat.color}`} />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                <p className="text-sm text-gray-600">{stat.label}</p>
+                <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                <p className="text-sm text-muted-foreground">{stat.label}</p>
               </div>
             </div>
           </CardContent>

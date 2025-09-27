@@ -52,10 +52,10 @@ export function FeaturedEvents() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Featured Events</h2>
-            <p className="text-gray-600">Don't miss these popular upcoming events</p>
+            <h2 className="text-3xl font-bold text-foreground mb-2">Featured Events</h2>
+            <p className="text-muted-foreground">Don't miss these popular upcoming events</p>
           </div>
-          <Button variant="ghost" className="text-blue-600 hover:text-blue-700">
+          <Button variant="ghost" className="text-primary hover:text-primary/80">
             View All →
           </Button>
         </div>

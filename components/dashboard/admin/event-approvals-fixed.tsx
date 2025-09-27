@@ -53,13 +53,13 @@ export function EventApprovals() {
   const getPriorityColor = (priority: string) => {
     switch (priority?.toLowerCase()) {
       case "high":
-        return "bg-red-100 text-red-800"
+        return "bg-destructive/10 text-destructive"
       case "medium":
-        return "bg-yellow-100 text-yellow-800"
+        return "bg-accent/20 text-accent-foreground"
       case "low":
-        return "bg-green-100 text-green-800"
+        return "bg-primary/10 text-primary"
       default:
-        return "bg-gray-100 text-gray-800"
+        return "bg-muted text-muted-foreground"
     }
   }
 
@@ -74,7 +74,7 @@ export function EventApprovals() {
       case "academic":
         return "bg-green-100 text-green-800"
       default:
-        return "bg-gray-100 text-gray-800"
+        return "bg-muted text-muted-foreground"
     }
   }
 
@@ -142,7 +142,7 @@ export function EventApprovals() {
 
   const handleSubmitFeedback = async () => {
     if (!feedbackText.trim()) {
-      showToast("Warning", "Please provide feedback before submitting.", "warning")
+      showToast("Warning", "Please provide feedback before submitting.", "info")
       return
     }
 
@@ -268,7 +268,7 @@ export function EventApprovals() {
                     </Button>
                     <Button
                       size="sm"
-                      className="bg-green-600 hover:bg-green-700 flex items-center gap-1 cursor-pointer"
+                      className="bg-primary hover:bg-primary/90 flex items-center gap-1 cursor-pointer"
                       onClick={() => handleApprove(event.id)}
                     >
                       <Check className="w-3 h-3" />
@@ -277,7 +277,7 @@ export function EventApprovals() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="flex items-center gap-1 text-red-600 hover:text-red-700 bg-transparent cursor-pointer"
+                      className="flex items-center gap-1 text-destructive hover:text-destructive/80 bg-transparent cursor-pointer"
                       onClick={() => handleReject(event.id)}
                     >
                       <X className="w-3 h-3" />
@@ -343,7 +343,7 @@ export function EventApprovals() {
 
               <div className="flex gap-2 pt-4">
                 <Button
-                  className="bg-green-600 hover:bg-green-700 cursor-pointer"
+                  className="bg-primary hover:bg-primary/90 cursor-pointer"
                   onClick={() => {
                     handleApprove(selectedEvent.id)
                     setShowDetailsModal(false)
@@ -353,7 +353,7 @@ export function EventApprovals() {
                 </Button>
                 <Button
                   variant="outline"
-                  className="text-red-600 hover:text-red-700 bg-transparent cursor-pointer"
+                  className="text-destructive hover:text-destructive/80 bg-transparent cursor-pointer"
                   onClick={() => {
                     handleReject(selectedEvent.id)
                     setShowDetailsModal(false)

@@ -96,22 +96,22 @@ export function AdminStats() {
       icon: Calendar,
       value: loading ? "..." : stats.totalEvents.toString(),
       label: "Total Events",
-      color: "text-blue-600",
-      bgColor: "bg-blue-100",
+      color: "text-primary",
+      bgColor: "bg-primary/10",
     },
     {
       icon: AlertTriangle,
       value: loading ? "..." : stats.pendingApprovals.toString(),
       label: "Pending Approvals",
-      color: "text-yellow-600",
-      bgColor: "bg-yellow-100",
+      color: "text-accent-foreground",
+      bgColor: "bg-accent/20",
     },
     {
       icon: Users,
       value: loading ? "..." : stats.activeUsers.toLocaleString(),
       label: "Active Users",
-      color: "text-green-600",
-      bgColor: "bg-green-100",
+      color: "text-primary",
+      bgColor: "bg-secondary/30",
     },
   ]
 
@@ -125,8 +125,8 @@ export function AdminStats() {
                 <stat.icon className={`w-6 h-6 ${stat.color}`} />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                <p className="text-sm text-gray-600">{stat.label}</p>
+                <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                <p className="text-sm text-muted-foreground">{stat.label}</p>
               </div>
             </div>
           </CardContent>
