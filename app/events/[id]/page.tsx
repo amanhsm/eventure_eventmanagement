@@ -10,6 +10,7 @@ import { format } from "date-fns"
 import { formatTimeWithoutSeconds } from "@/lib/utils/time-format"
 import { useAuth } from "@/hooks/use-auth"
 import { createClient } from "@/lib/supabase/client"
+import StripeCheckout from "@/components/stripe-checkout"
 
 interface EventDetail {
   id: number
@@ -488,13 +489,32 @@ export default function EventDetailPage() {
                         </p>
                       </div>
                     ) : (
-                      <Button 
-                        onClick={handleRegister}
-                        disabled={isRegistering || isRegistered || isCancelled || isEventFull}
-                        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer rounded-lg py-3 h-auto font-semibold text-base"
-                      >
-                        {isRegistering ? "Registering..." : isRegistered ? "Already Registered" : isCancelled ? "Registration Cancelled" : isEventFull ? "Event Full" : `Register ${event.registration_fee > 0 ? `(₹${event.registration_fee})` : "(Free)"}`}
-                      </Button>
+                      <>
+                        {event.registration_fee > 0 ? (
+                          <StripeCheckout
+                            eventId={event.id}
+                            eventTitle={event.title}
+                            registrationFee={event.registration_fee}
+                            onSuccess={() => {
+                              setIsRegistered(true)
+                              setError(null)
+                              setIsRegistering(false)
+                            }}
+                            onError={(errorMessage) => {
+                              setError(errorMessage)
+                              setIsRegistering(false)
+                            }}
+                          />
+                        ) : (
+                          <Button 
+                            onClick={handleRegister}
+                            disabled={isRegistering || isRegistered || isCancelled || isEventFull}
+                            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer rounded-lg py-3 h-auto font-semibold text-base"
+                          >
+                            {isRegistering ? "Registering..." : isRegistered ? "Already Registered" : isCancelled ? "Registration Cancelled" : isEventFull ? "Event Full" : "Register (Free)"}
+                          </Button>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
