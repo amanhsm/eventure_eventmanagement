@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Calendar, MapPin, Users, Clock, DollarSign, User, ArrowLeft } from "lucide-react"
 import { format } from "date-fns"
+import { ArrowLeft, Calendar, Clock, MapPin, User, Users, DollarSign } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/use-auth"
 import { createClient } from "@/lib/supabase/client"
+import StripeCheckout from "@/components/stripe-checkout"
 
 interface EventDetail {
   id: number
@@ -487,13 +488,20 @@ export default function EventDetailPage() {
                         </p>
                       </div>
                     ) : (
-                      <Button 
-                        onClick={handleRegister}
-                        disabled={isRegistering || isRegistered || isCancelled || isEventFull}
-                        className="w-full bg-[#799EFF] hover:bg-[#6B8EFF] text-white cursor-pointer"
-                      >
-                        {isRegistering ? "Registering..." : isRegistered ? "Already Registered" : isCancelled ? "Registration Cancelled" : isEventFull ? "Event Full" : `Register ${event.registration_fee > 0 ? `(₹${event.registration_fee})` : "(Free)"}`}
-                      </Button>
+                      <StripeCheckout
+                        eventId={event.id}
+                        eventTitle={event.title}
+                        registrationFee={event.registration_fee}
+                        onSuccess={() => {
+                          setIsRegistered(true)
+                          setError(null)
+                          setIsRegistering(false)
+                        }}
+                        onError={(errorMessage) => {
+                          setError(errorMessage)
+                          setIsRegistering(false)
+                        }}
+                      />
                     )}
                   </div>
                 )}
