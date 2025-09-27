@@ -42,7 +42,6 @@ interface EventGridProps {
   searchQuery: string
   categoryFilter: string
   quickFilter: string
-  venueId: number | null
   sortBy: string
   onSortByChange: (value: string) => void
 }
@@ -51,7 +50,6 @@ export default function EventGrid({
   searchQuery,
   categoryFilter,
   quickFilter,
-  venueId,
   sortBy,
   onSortByChange,
 }: EventGridProps) {
@@ -185,10 +183,6 @@ export default function EventGrid({
       })
     }
 
-    // Venue filter
-    if (venueId) {
-      filtered = filtered.filter((e) => e.venue_id === venueId)
-    }
 
     // Quick filters
     const today = new Date()
@@ -225,7 +219,7 @@ export default function EventGrid({
     }
 
     setFilteredEvents(sorted)
-  }, [events, categoryFilter, searchQuery, venueId, quickFilter, sortBy])
+  }, [events, categoryFilter, searchQuery, quickFilter, sortBy])
 
   const transformEventForCard = (event: Event) => ({
     id: event.id,

@@ -10,14 +10,12 @@ export default function BrowsePage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [selectedQuickFilter, setSelectedQuickFilter] = useState<string>("")
-  const [selectedVenueId, setSelectedVenueId] = useState<number | null>(null)
   const [sortBy, setSortBy] = useState<string>("upcoming")
 
   const clearAllFilters = () => {
     setSearchQuery("")
     setSelectedCategory("all")
     setSelectedQuickFilter("")
-    setSelectedVenueId(null)
     setSortBy("upcoming")
   }
 
@@ -35,8 +33,6 @@ export default function BrowsePage() {
               onCategoryChange={setSelectedCategory}
               selectedQuickFilter={selectedQuickFilter}
               onQuickFilterChange={setSelectedQuickFilter}
-              selectedVenueId={selectedVenueId}
-              onVenueSelect={setSelectedVenueId}
               onClearFilters={clearAllFilters}
             />
           </aside>
@@ -45,7 +41,6 @@ export default function BrowsePage() {
               searchQuery={searchQuery}
               categoryFilter={selectedCategory}
               quickFilter={selectedQuickFilter}
-              venueId={selectedVenueId}
               sortBy={sortBy}
               onSortByChange={setSortBy}
             />
